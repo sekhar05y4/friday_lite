@@ -40,6 +40,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final url = await SettingsRepository.instance.getBackendUrl();
     final lastRef = await SettingsRepository.instance.getString('last_refreshed_timestamp', '');
 
+    ApiService.instance.setBaseUrl(url);
+
     if (mounted) {
       setState(() {
         _activeProvider = provider;
@@ -63,9 +65,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     final nowStr = _formattedNow();
+    final targetUrl = _urlCtrl.text.trim();
 
-    // 1. Save settings
-    await SettingsRepository.instance.setBackendUrl(_urlCtrl.text.trim());
+    // 1. Save settings & update ApiService base URL
+    ApiService.instance.setBaseUrl(targetUrl);
+    await SettingsRepository.instance.setBackendUrl(targetUrl);
     await SettingsRepository.instance.setString('last_refreshed_timestamp', nowStr);
 
     // 2. Refresh capability registry & module discovery
@@ -91,15 +95,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _testConnection() async {
-    setState(() => _testResult = 'Testing connection…');
-    ApiService.instance.setBaseUrl(_urlCtrl.text.trim());
-    await SettingsRepository.instance.setBackendUrl(_urlCtrl.text.trim());
+    final targetUrl = _urlCtrl.text.trim();
+    setState(() => _testResult = 'Testing $targetUrl…');
+
+    ApiService.instance.setBaseUrl(targetUrl);
+    await SettingsRepository.instance.setBackendUrl(targetUrl);
+
     final isOnline = await ApiService.instance.checkHealth();
     if (mounted) {
       setState(() {
         _testResult = isOnline
             ? '✅ Connected to backend successfully!'
-            : '⚠️ Backend offline. On-Device Fallback active.';
+            : '⚠️ Backend offline. Ensure PC and phone are on same Wi-Fi & port 5000 is allowed in Windows Firewall.';
       });
     }
   }
@@ -249,7 +256,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Backend URL',
                     labelStyle: TextStyle(color: ThemeConfig.textSecondary),
-                    hintText: 'http://10.0.2.2:5000',
+                    hintText: 'http://192.168.1.6:5000',
                     hintStyle: TextStyle(color: ThemeConfig.textMuted),
                     border: OutlineInputBorder(),
                   ),
@@ -265,15 +272,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: const Text('Test Connection'),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _testResult,
-                        style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12),
-                      ),
-                    ),
                   ],
                 ),
+                if (_testResult.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _testResult,
+                    style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12),
+                  ),
+                ],
               ],
             ),
           ),

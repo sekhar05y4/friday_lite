@@ -3,7 +3,7 @@ import '../models/intent_result.dart';
 import '../services/api_service.dart';
 import '../utils/logger.dart';
 
-/// Gemini AI Provider implementation with Rich Offline Conversational Knowledge Engine.
+/// Gemini AI Provider implementation with Intelligent Normalizer & Offline Engine.
 class GeminiProvider implements IAIProvider {
   @override
   String get providerId => 'gemini';
@@ -48,68 +48,63 @@ class GeminiProvider implements IAIProvider {
     };
   }
 
-  /// Rich Offline Conversational Knowledge Base & Dynamic Intelligence Engine
+  /// Normalises stuttered/repeated speech input and generates dynamic offline answers.
   String _generateOfflineFallback(String input) {
-    final lower = input.toLowerCase().trim();
+    // 1. Clean and deduplicate repeated words (e.g. "whatwhatwhat canwhat can you" -> "what can you")
+    final cleaned = input
+        .replaceAll(RegExp(r'([a-zA-Z]+)\1+'), r'$1')
+        .replaceAll(RegExp(r'\b(\w+)(?:\s+\1)+\b', caseSensitive: false), r'$1')
+        .toLowerCase()
+        .trim();
 
-    // ── 1. Capabilities & Help ──────────────────────────────────────────────
-    if (lower.contains('what can you do') ||
-        lower.contains('features') ||
-        lower.contains('help') ||
-        lower.contains('capabilities')) {
-      return "I can manage phone calls, send SMS with voice confirmation, search contacts, launch apps, set natural reminders, take voice notes, manage calendar agenda, control flashlight/Wi-Fi/Bluetooth, scan QR/Barcodes with Vision, store long-term memories, automate device rules, control smart home devices, and remote-control desktop PCs.";
+    FridayLogger.log(LogCategory.assistant, 'GeminiProvider normalized speech: "$cleaned"');
+
+    // ── Capabilities & What can you do ────────────────────────────────────
+    if (cleaned.contains('what can you do') ||
+        cleaned.contains('what do you do') ||
+        cleaned.contains('do for me') ||
+        cleaned.contains('features') ||
+        cleaned.contains('help') ||
+        cleaned.contains('capabilities')) {
+      return "I can place phone calls, draft SMS messages, search contacts, launch apps, set reminders, manage your calendar & to-do list, control flashlight & device settings, scan QR/barcodes with Vision, store long-term memories, automate rules, and control smart home devices.";
     }
 
-    // ── 2. System Architecture & Modules Count ──────────────────────────────
-    if (lower.contains('system') || lower.contains('module') || lower.contains('how many')) {
-      return "FRIDAY Lite has 20 core feature modules integrated across Telephony, Productivity, Device Control, Camera Vision Platform, Long-Term Memory, Desktop Companion, Automation Engine, and Smart Home Platform.";
+    // ── Systems & Modules Count ───────────────────────────────────────────
+    if (cleaned.contains('system') ||
+        cleaned.contains('module') ||
+        cleaned.contains('how many')) {
+      return "FRIDAY Lite consists of 20 integrated local systems covering Telephony, Productivity, Device Control, Camera Vision, Long-Term Memory, Desktop Companion, Automation Engine, and Smart Home Platform.";
     }
 
-    // ── 3. Identity ─────────────────────────────────────────────────────────
-    if (lower.contains('who are you') || lower.contains('name') || lower.contains('who made you')) {
-      return "I am FRIDAY, your personal AI assistant built with Flutter Clean Architecture, local-first command routing, and 20 integrated feature modules.";
+    // ── Identity & Who are you ──────────────────────────────────────────────
+    if (cleaned.contains('who are you') ||
+        cleaned.contains('your name') ||
+        cleaned.contains('what is it') ||
+        cleaned.contains('what is this')) {
+      return "I am FRIDAY, your advanced AI assistant. I handle your daily tasks, phone calls, device controls, and smart home automation.";
     }
 
-    // ── 4. Greetings ────────────────────────────────────────────────────────
-    if (lower.startsWith('hi') || lower.startsWith('hello') || lower.startsWith('hey')) {
-      return "Hello! How can I assist you today? All 20 local systems, telephony, and device controls are active.";
+    // ── Greetings ─────────────────────────────────────────────────────────
+    if (cleaned.startsWith('hi') || cleaned.startsWith('hello') || cleaned.startsWith('hey')) {
+      return "Hello! I am online and ready to assist you.";
     }
 
-    // ── 5. Time & Date ──────────────────────────────────────────────────────
-    if (lower.contains('time') || lower.contains('clock')) {
+    // ── Time & Date ───────────────────────────────────────────────────────
+    if (cleaned.contains('time') || cleaned.contains('clock')) {
       final now = DateTime.now();
-      final minuteStr = now.minute.toString().padLeft(2, '0');
       final period = now.hour >= 12 ? 'PM' : 'AM';
       final hour12 = now.hour == 0 ? 12 : (now.hour > 12 ? now.hour - 12 : now.hour);
-      return "The current time is $hour12:$minuteStr $period.";
+      return "The current time is $hour12:${now.minute.toString().padLeft(2, '0')} $period.";
     }
 
-    if (lower.contains('date') || lower.contains('day') || lower.contains('today')) {
+    if (cleaned.contains('date') || cleaned.contains('day') || cleaned.contains('today')) {
       final now = DateTime.now();
       final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       return "Today is ${months[now.month - 1]} ${now.day}, ${now.year}.";
     }
 
-    // ── 6. Math & Calculations ─────────────────────────────────────────────
-    if (RegExp(r'\d+\s*[\+\-\*\/]\s*\d+').hasMatch(lower)) {
-      try {
-        final match = RegExp(r'(\d+)\s*([\+\-\*\/])\s*(\d+)').firstMatch(lower);
-        if (match != null) {
-          final n1 = double.parse(match.group(1)!);
-          final op = match.group(2)!;
-          final n2 = double.parse(match.group(3)!);
-          double res = 0;
-          if (op == '+') res = n1 + n2;
-          if (op == '-') res = n1 - n2;
-          if (op == '*') res = n1 * n2;
-          if (op == '/') res = n2 != 0 ? n1 / n2 : 0;
-          return "The result of $n1 $op $n2 is ${res.toStringAsFixed(res.truncateToDouble() == res ? 0 : 2)}.";
-        }
-      } catch (_) {}
-    }
-
-    // ── 7. Dynamic Contextual Fallback ──────────────────────────────────────
-    return "I am processing your query: '$input'. All 20 local feature modules are online. Connect to FRIDAY backend for full cloud AI reasoning.";
+    // ── Dynamic intelligent fallback for general queries ──────────────────
+    return "I understand you asked: '$cleaned'. All 20 local assistant modules are active. To connect to full Gemini cloud AI, ensure your phone and PC are on the same Wi-Fi and port 5000 is allowed in Windows Firewall.";
   }
 
   @override
