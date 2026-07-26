@@ -32,6 +32,9 @@ class FridayCore extends ChangeNotifier {
   /// subscribe to [PowerChangedEvent] on the [EventBus].
   PowerMode get powerMode => _powerMode;
 
+  /// Number of registered local modules.
+  int get moduleCount => ModuleRegistry.instance.modules.length;
+
   // ---------------------------------------------------------------------------
   // Initialisation
   // ---------------------------------------------------------------------------
