@@ -58,6 +58,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return "$date $time";
   }
 
+  Future<void> _saveUrl(String targetUrl) async {
+    final cleanUrl = targetUrl.trim();
+    if (cleanUrl.isEmpty) return;
+    ApiService.instance.setBaseUrl(cleanUrl);
+    await SettingsRepository.instance.setBackendUrl(cleanUrl);
+  }
+
   Future<void> _refreshAppState() async {
     setState(() {
       _isRefreshing = true;
@@ -65,17 +72,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     final nowStr = _formattedNow();
-    final targetUrl = _urlCtrl.text.trim();
+    await _saveUrl(_urlCtrl.text);
 
-    // 1. Save settings & update ApiService base URL
-    ApiService.instance.setBaseUrl(targetUrl);
-    await SettingsRepository.instance.setBackendUrl(targetUrl);
     await SettingsRepository.instance.setString('last_refreshed_timestamp', nowStr);
-
-    // 2. Refresh capability registry & module discovery
     CapabilityManager.instance.refresh();
-
-    // 3. Trigger Automation Engine evaluation
     await AutomationEngine.instance.evaluateAllRules();
 
     if (mounted) {
@@ -98,8 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final targetUrl = _urlCtrl.text.trim();
     setState(() => _testResult = 'Testing $targetUrl…');
 
-    ApiService.instance.setBaseUrl(targetUrl);
-    await SettingsRepository.instance.setBackendUrl(targetUrl);
+    await _saveUrl(targetUrl);
 
     final isOnline = await ApiService.instance.checkHealth();
     if (mounted) {
@@ -124,224 +123,233 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: ThemeConfig.background,
-      appBar: AppBar(
-        title: Text(
-          'SETTINGS & FEATURES',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontSize: 14,
-                letterSpacing: 4,
-                color: ThemeConfig.textPrimary,
-              ),
-        ),
-        centerTitle: true,
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          await _saveUrl(_urlCtrl.text);
+        }
+      },
+      child: Scaffold(
         backgroundColor: ThemeConfig.background,
-        iconTheme: const IconThemeData(color: ThemeConfig.textSecondary),
-        actions: [
-          IconButton(
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: ThemeConfig.primary),
-                  )
-                : const Icon(Icons.sync_rounded),
-            color: ThemeConfig.primary,
-            tooltip: 'Sync & Refresh App',
-            onPressed: _isRefreshing ? null : _refreshAppState,
+        appBar: AppBar(
+          title: Text(
+            'SETTINGS & FEATURES',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 14,
+                  letterSpacing: 4,
+                  color: ThemeConfig.textPrimary,
+                ),
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        physics: const BouncingScrollPhysics(),
-        children: [
-          // ── App Sync & Status Banner ─────────────────────────────────────
-          GlassCard(
-            glowColor: ThemeConfig.primary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.verified_rounded, color: ThemeConfig.statusListening, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'SYSTEM STATUS: UP TO DATE',
-                          style: TextStyle(
-                            color: ThemeConfig.statusListening,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
+          centerTitle: true,
+          backgroundColor: ThemeConfig.background,
+          iconTheme: const IconThemeData(color: ThemeConfig.textSecondary),
+          actions: [
+            IconButton(
+              icon: _isRefreshing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: ThemeConfig.primary),
+                    )
+                  : const Icon(Icons.sync_rounded),
+              color: ThemeConfig.primary,
+              tooltip: 'Sync & Refresh App',
+              onPressed: _isRefreshing ? null : _refreshAppState,
+            ),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          physics: const BouncingScrollPhysics(),
+          children: [
+            // ── App Sync & Status Banner ─────────────────────────────────────
+            GlassCard(
+              glowColor: ThemeConfig.primary,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.verified_rounded, color: ThemeConfig.statusListening, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'SYSTEM STATUS: UP TO DATE',
+                            style: TextStyle(
+                              color: ThemeConfig.statusListening,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
                           ),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _isRefreshing ? null : _refreshAppState,
+                        icon: const Icon(Icons.refresh_rounded, size: 14),
+                        label: const Text('REFRESH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ThemeConfig.primary,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
-                      ],
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: _isRefreshing ? null : _refreshAppState,
-                      icon: const Icon(Icons.refresh_rounded, size: 14),
-                      label: const Text('REFRESH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ThemeConfig.primary,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Last Refreshed: $_lastRefreshed',
-                  style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12, fontFamily: 'monospace'),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── AI Provider Selection ─────────────────────────────────────────
-          _buildHeader('AI PROVIDER SELECTION', Icons.psychology_rounded),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Icon(
-                    Icons.cloud_rounded,
-                    color: _activeProvider == 'gemini' ? ThemeConfig.primary : ThemeConfig.textMuted,
+                    ],
                   ),
-                  title: const Text('Gemini AI (Cloud + Fallback)', style: TextStyle(color: ThemeConfig.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('Connects to Flask Backend / Gemini API with intelligent offline fallback.', style: TextStyle(color: ThemeConfig.textSecondary, fontSize: 12)),
-                  trailing: Switch(
-                    value: _activeProvider == 'gemini',
-                    activeTrackColor: ThemeConfig.primary.withValues(alpha: 0.5),
-                    onChanged: (val) => _switchProvider(val ? 'gemini' : 'local_llm'),
-                  ),
-                ),
-                const Divider(color: ThemeConfig.border),
-                ListTile(
-                  leading: Icon(
-                    Icons.cell_wifi_rounded,
-                    color: _activeProvider == 'local_llm' ? ThemeConfig.primary : ThemeConfig.textMuted,
-                  ),
-                  title: const Text('Local LLM (100% Offline)', style: TextStyle(color: ThemeConfig.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
-                  subtitle: const Text('Connects directly to local Ollama / llama.cpp REST inference server.', style: TextStyle(color: ThemeConfig.textSecondary, fontSize: 12)),
-                  trailing: Switch(
-                    value: _activeProvider == 'local_llm',
-                    activeTrackColor: ThemeConfig.primary.withValues(alpha: 0.5),
-                    onChanged: (val) => _switchProvider(val ? 'local_llm' : 'gemini'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Backend Config ───────────────────────────────────────────────
-          _buildHeader('BACKEND SERVER CONFIG', Icons.dns_rounded),
-          const SizedBox(height: 8),
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _urlCtrl,
-                  style: const TextStyle(color: ThemeConfig.textPrimary, fontSize: 13),
-                  decoration: const InputDecoration(
-                    labelText: 'Backend URL',
-                    labelStyle: TextStyle(color: ThemeConfig.textSecondary),
-                    hintText: 'http://192.168.1.6:5000',
-                    hintStyle: TextStyle(color: ThemeConfig.textMuted),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    ElevatedButton(
-                      onPressed: _testConnection,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: ThemeConfig.surfaceElevated,
-                        foregroundColor: ThemeConfig.primary,
-                      ),
-                      child: const Text('Test Connection'),
-                    ),
-                  ],
-                ),
-                if (_testResult.isNotEmpty) ...[
                   const SizedBox(height: 10),
                   Text(
-                    _testResult,
-                    style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12),
+                    'Last Refreshed: $_lastRefreshed',
+                    style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12, fontFamily: 'monospace'),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
 
-          const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-          // ── All 20 Feature Systems Showcase ──────────────────────────────
-          _buildHeader('INTEGRATED FEATURE MODULES (${FridayCore.instance.moduleCount})', Icons.apps_rounded),
-          const SizedBox(height: 8),
+            // ── AI Provider Selection ─────────────────────────────────────────
+            _buildHeader('AI PROVIDER SELECTION', Icons.psychology_rounded),
+            const SizedBox(height: 8),
+            GlassCard(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: Icon(
+                      Icons.cloud_rounded,
+                      color: _activeProvider == 'gemini' ? ThemeConfig.primary : ThemeConfig.textMuted,
+                    ),
+                    title: const Text('Gemini AI (Cloud + Fallback)', style: TextStyle(color: ThemeConfig.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Connects to Flask Backend / Gemini API with intelligent offline fallback.', style: TextStyle(color: ThemeConfig.textSecondary, fontSize: 12)),
+                    trailing: Switch(
+                      value: _activeProvider == 'gemini',
+                      activeTrackColor: ThemeConfig.primary.withValues(alpha: 0.5),
+                      onChanged: (val) => _switchProvider(val ? 'gemini' : 'local_llm'),
+                    ),
+                  ),
+                  const Divider(color: ThemeConfig.border),
+                  ListTile(
+                    leading: Icon(
+                      Icons.cell_wifi_rounded,
+                      color: _activeProvider == 'local_llm' ? ThemeConfig.primary : ThemeConfig.textMuted,
+                    ),
+                    title: const Text('Local LLM (100% Offline)', style: TextStyle(color: ThemeConfig.textPrimary, fontWeight: FontWeight.bold, fontSize: 14)),
+                    subtitle: const Text('Connects directly to local Ollama / llama.cpp REST inference server.', style: TextStyle(color: ThemeConfig.textSecondary, fontSize: 12)),
+                    trailing: Switch(
+                      value: _activeProvider == 'local_llm',
+                      activeTrackColor: ThemeConfig.primary.withValues(alpha: 0.5),
+                      onChanged: (val) => _switchProvider(val ? 'local_llm' : 'gemini'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-          _buildFeatureTile(
-            title: 'Camera Vision Platform',
-            subtitle: 'QR Scanner, OCR, Face & Object Detection',
-            icon: Icons.camera_alt_rounded,
-            color: ThemeConfig.accent,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraVisionScreen())),
-          ),
-          _buildFeatureTile(
-            title: 'Desktop Companion',
-            subtitle: 'Remote PC screenshot, commands, clipboard, volume & apps',
-            icon: Icons.desktop_windows_rounded,
-            color: ThemeConfig.primary,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DesktopCompanionScreen())),
-          ),
-          _buildFeatureTile(
-            title: 'Automation Engine',
-            subtitle: 'Triggers, conditions, rules & execution logs',
-            icon: Icons.auto_mode_rounded,
-            color: ThemeConfig.accent,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutomationScreen())),
-          ),
-          _buildFeatureTile(
-            title: 'Smart Home Platform',
-            subtitle: 'Home Assistant, Google Home, Alexa, Matter, Zigbee, MQTT & BLE',
-            icon: Icons.home_max_rounded,
-            color: ThemeConfig.primary,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SmartHomeScreen())),
-          ),
-          _buildFeatureTile(
-            title: 'Developer Diagnostics',
-            subtitle: 'System metrics, latency, memory, plugins & permissions',
-            icon: Icons.developer_mode_rounded,
-            color: ThemeConfig.primary,
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DiagnosticsScreen())),
-          ),
+            const SizedBox(height: 20),
 
-          const SizedBox(height: 12),
-          const Text(
-            'ADDITIONAL INTEGRATED LOCAL MODULES',
-            style: TextStyle(color: ThemeConfig.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
-          ),
-          const SizedBox(height: 8),
+            // ── Backend Config ───────────────────────────────────────────────
+            _buildHeader('BACKEND SERVER CONFIG', Icons.dns_rounded),
+            const SizedBox(height: 8),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _urlCtrl,
+                    style: const TextStyle(color: ThemeConfig.textPrimary, fontSize: 13),
+                    onChanged: (val) => _saveUrl(val),
+                    onSubmitted: (val) => _saveUrl(val),
+                    decoration: const InputDecoration(
+                      labelText: 'Backend URL',
+                      labelStyle: TextStyle(color: ThemeConfig.textSecondary),
+                      hintText: 'http://192.168.1.6:5000',
+                      hintStyle: TextStyle(color: ThemeConfig.textMuted),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _testConnection,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: ThemeConfig.surfaceElevated,
+                          foregroundColor: ThemeConfig.primary,
+                        ),
+                        child: const Text('Test Connection'),
+                      ),
+                    ],
+                  ),
+                  if (_testResult.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _testResult,
+                      style: const TextStyle(color: ThemeConfig.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            ),
 
-          _buildModuleSummaryTile('📞 Telephony & SMS Assistant', 'Phone calls, dialer, recent calls, contact resolution, voice confirmation SMS'),
-          _buildModuleSummaryTile('📝 Productivity Suite', 'Natural language reminders, voice notes, calendar agenda, alarms, to-do lists, clipboard sync'),
-          _buildModuleSummaryTile('⚡ Device Control System', 'Flashlight, Wi-Fi, Bluetooth, Hotspot, Display, Volume, Silent Mode, Airplane Mode'),
-          _buildModuleSummaryTile('🚀 Intelligent App Launcher', 'Fuzzy matching app launch, usage stats, recent & favorite apps'),
-          _buildModuleSummaryTile('🧠 Long-Term Memory System', 'SQLite memory storage for conversation, preference, knowledge, relationship & task memory'),
+            const SizedBox(height: 20),
 
-          const SizedBox(height: 32),
-        ],
+            // ── All 20 Feature Systems Showcase ──────────────────────────────
+            _buildHeader('INTEGRATED FEATURE MODULES (${FridayCore.instance.moduleCount})', Icons.apps_rounded),
+            const SizedBox(height: 8),
+
+            _buildFeatureTile(
+              title: 'Camera Vision Platform',
+              subtitle: 'QR Scanner, OCR, Face & Object Detection',
+              icon: Icons.camera_alt_rounded,
+              color: ThemeConfig.accent,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CameraVisionScreen())),
+            ),
+            _buildFeatureTile(
+              title: 'Desktop Companion',
+              subtitle: 'Remote PC screenshot, commands, clipboard, volume & apps',
+              icon: Icons.desktop_windows_rounded,
+              color: ThemeConfig.primary,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DesktopCompanionScreen())),
+            ),
+            _buildFeatureTile(
+              title: 'Automation Engine',
+              subtitle: 'Triggers, conditions, rules & execution logs',
+              icon: Icons.auto_mode_rounded,
+              color: ThemeConfig.accent,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AutomationScreen())),
+            ),
+            _buildFeatureTile(
+              title: 'Smart Home Platform',
+              subtitle: 'Home Assistant, Google Home, Alexa, Matter, Zigbee, MQTT & BLE',
+              icon: Icons.home_max_rounded,
+              color: ThemeConfig.primary,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SmartHomeScreen())),
+            ),
+            _buildFeatureTile(
+              title: 'Developer Diagnostics',
+              subtitle: 'System metrics, latency, memory, plugins & permissions',
+              icon: Icons.developer_mode_rounded,
+              color: ThemeConfig.primary,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DiagnosticsScreen())),
+            ),
+
+            const SizedBox(height: 12),
+            const Text(
+              'ADDITIONAL INTEGRATED LOCAL MODULES',
+              style: TextStyle(color: ThemeConfig.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+            ),
+            const SizedBox(height: 8),
+
+            _buildModuleSummaryTile('📞 Telephony & SMS Assistant', 'Phone calls, dialer, recent calls, contact resolution, voice confirmation SMS'),
+            _buildModuleSummaryTile('📝 Productivity Suite', 'Natural language reminders, voice notes, calendar agenda, alarms, to-do lists, clipboard sync'),
+            _buildModuleSummaryTile('⚡ Device Control System', 'Flashlight, Wi-Fi, Bluetooth, Hotspot, Display, Volume, Silent Mode, Airplane Mode'),
+            _buildModuleSummaryTile('🚀 Intelligent App Launcher', 'Fuzzy matching app launch, usage stats, recent & favorite apps'),
+            _buildModuleSummaryTile('🧠 Long-Term Memory System', 'SQLite memory storage for conversation, preference, knowledge, relationship & task memory'),
+
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
