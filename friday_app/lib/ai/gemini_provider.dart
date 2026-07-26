@@ -48,7 +48,7 @@ class GeminiProvider implements IAIProvider {
     };
   }
 
-  /// Generates domain-specific, informative answers offline instead of repeating identity intros.
+  /// Generates dynamic, natural conversational answers offline instead of repetitive templates.
   String _generateOfflineFallback(String input) {
     final cleaned = input
         .replaceAll(RegExp(r'([a-zA-Z]{3,})\1+'), r'$1')
@@ -58,7 +58,25 @@ class GeminiProvider implements IAIProvider {
 
     FridayLogger.log(LogCategory.assistant, 'GeminiProvider normalized query: "$cleaned"');
 
-    // ── 1. Capabilities & Feature Breakdown ───────────────────────────────────
+    // ── 1. Human / AI Identity Questions ──────────────────────────────────
+    if (cleaned.contains('human') || cleaned.contains('person') || cleaned.contains('robot') || cleaned.contains('real')) {
+      return "No, I am not a human. I am FRIDAY, an artificial intelligence assistant created to help you with calls, messaging, device controls, automation, and smart home management.";
+    }
+
+    if (cleaned == 'who are you' || cleaned == 'what are you' || cleaned.contains('your name') || cleaned.contains('who made you')) {
+      return "I am FRIDAY, your personal AI assistant. I run locally on your device with 20 feature modules and can connect to Gemini AI or local LLMs for cloud reasoning.";
+    }
+
+    // ── 2. Feedback / Gratitude (good, thanks, awesome, great) ──────────────
+    if (cleaned == 'good' || cleaned == 'great' || cleaned == 'nice' || cleaned == 'awesome' || cleaned == 'cool') {
+      return "Thank you! I am glad I could help. Let me know if you need anything else.";
+    }
+
+    if (cleaned.contains('thank') || cleaned.contains('thanks')) {
+      return "You're very welcome! I am always here to assist you.";
+    }
+
+    // ── 3. Capabilities & Feature Breakdown ──────────────────────────────────
     if (cleaned.contains('what can you do') ||
         cleaned.contains('what do you do') ||
         cleaned.contains('do for me') ||
@@ -75,7 +93,7 @@ class GeminiProvider implements IAIProvider {
              "• Automation Engine & Smart Home: Trigger-condition rules, Matter, Zigbee, Home Assistant, Google, Alexa.";
     }
 
-    // ── 2. System Architecture & Module Breakdown ────────────────────────────
+    // ── 4. System Architecture & Module Breakdown ───────────────────────────
     if (cleaned.contains('system') || cleaned.contains('module') || cleaned.contains('how many')) {
       return "FRIDAY Lite consists of 20 integrated feature systems:\n"
              "1. Phone Call Assistant  2. SMS Voice Assistant  3. Contacts Manager\n"
@@ -87,12 +105,7 @@ class GeminiProvider implements IAIProvider {
              "19. Local LLM Provider  20. Automation Engine  21. Smart Home Platform";
     }
 
-    // ── 3. Identity Queries ──────────────────────────────────────────────────
-    if (cleaned == 'who are you' || cleaned == 'what is your name' || cleaned == 'who made you') {
-      return "I am FRIDAY, your personal AI assistant. I am built with Flutter Clean Architecture and an offline-first command router to assist you with daily tasks, productivity, device controls, and smart home automation.";
-    }
-
-    // ── 4. Instructions / How to Use ──────────────────────────────────────────
+    // ── 5. Instructions / How to Use ────────────────────────────────────────
     if (cleaned.startsWith('how to') || cleaned.startsWith('how do i')) {
       if (cleaned.contains('call') || cleaned.contains('message') || cleaned.contains('sms')) {
         return "To make a call or send SMS, say 'Call Mom' or 'Message Dad I will be late'. I will verify permissions and ask for your confirmation before sending.";
@@ -106,7 +119,7 @@ class GeminiProvider implements IAIProvider {
       return "You can issue direct voice commands or type prompts in the chat box below. Check Settings → Integrated Feature Modules to explore all 20 modules.";
     }
 
-    // ── 5. Math & Conversions ────────────────────────────────────────────────
+    // ── 6. Math & Conversions ──────────────────────────────────────────────
     if (RegExp(r'\d+\s*[\+\-\*\/]\s*\d+').hasMatch(cleaned)) {
       try {
         final match = RegExp(r'(\d+)\s*([\+\-\*\/])\s*(\d+)').firstMatch(cleaned);
@@ -124,7 +137,7 @@ class GeminiProvider implements IAIProvider {
       } catch (_) {}
     }
 
-    // ── 6. Time & Date ───────────────────────────────────────────────────────
+    // ── 7. Time & Date ─────────────────────────────────────────────────────
     if (cleaned.contains('time') || cleaned.contains('clock')) {
       final now = DateTime.now();
       final period = now.hour >= 12 ? 'PM' : 'AM';
@@ -138,13 +151,13 @@ class GeminiProvider implements IAIProvider {
       return "Today is ${months[now.month - 1]} ${now.day}, ${now.year}.";
     }
 
-    // ── 7. Greetings ─────────────────────────────────────────────────────────
+    // ── 8. Greetings ───────────────────────────────────────────────────────
     if (cleaned.startsWith('hi') || cleaned.startsWith('hello') || cleaned.startsWith('hey')) {
       return "Hello! How can I assist you today? All 20 local systems are online and ready.";
     }
 
-    // ── 8. Informative Contextual Answer for Unrecognized General Prompts ─────
-    return "Regarding '$cleaned': All 20 local assistant modules are ready to execute commands. For full web search and cloud reasoning, test your server connection in Settings or switch to Local LLM mode.";
+    // ── 9. Dynamic Contextual Conversational Fallback ─────────────────────────
+    return "I heard: '$cleaned'. All 20 local feature modules are active. For full web search and cloud reasoning, test your server connection in Settings or switch to Local LLM mode.";
   }
 
   @override
