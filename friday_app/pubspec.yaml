@@ -1,0 +1,62 @@
+name: friday_app
+description: "FRIDAY Lite v1 — Personal AI Android Assistant"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  provider: ^6.1.2
+
+  # Voice
+  speech_to_text: ^7.0.0
+  flutter_tts: ^4.2.0
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # Device Actions
+  url_launcher: ^6.3.0
+  android_intent_plus: ^5.1.0
+
+  # Notifications
+  flutter_local_notifications: ^17.2.3
+
+  # Database
+  sqflite: ^2.4.1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # Network
+  http: ^1.2.2
+  connectivity_plus: ^6.1.1
+
+  # Device Info
+  battery_plus: ^6.0.3
+  device_info_plus: ^10.1.2
+
+  # UI / Fonts / Animation
+  google_fonts: ^6.2.1
+  lottie: ^3.1.3
+
+  # Persistent Storage
+  shared_preferences: ^2.3.3
+
+  # Icons
+  flutter_svg: ^2.0.10+1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/animations/
+    - assets/images/
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
