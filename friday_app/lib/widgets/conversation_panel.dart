@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
 import '../config/theme_config.dart';
 import '../providers/assistant_provider.dart';
 import 'glass_card.dart';
 
-/// Scrollable conversation panel showing the recent exchange history.
-///
-/// User messages align right; assistant messages align left.
-/// New messages slide in from the bottom with a fade.
+/// Scrollable conversation panel showing recent exchange history
+/// plus an inline text prompt input field.
 class ConversationPanel extends StatefulWidget {
   final List<AssistantMessage> messages;
   final String interimText;
@@ -23,6 +23,7 @@ class ConversationPanel extends StatefulWidget {
 
 class _ConversationPanelState extends State<ConversationPanel> {
   final ScrollController _scrollCtrl = ScrollController();
+  final TextEditingController _textCtrl = TextEditingController();
 
   @override
   void didUpdateWidget(ConversationPanel oldWidget) {
@@ -43,45 +44,99 @@ class _ConversationPanelState extends State<ConversationPanel> {
     }
   }
 
+  void _handleSend() {
+    final text = _textCtrl.text.trim();
+    if (text.isEmpty) return;
+    _textCtrl.clear();
+    context.read<AssistantProvider>().processTextInput(text);
+  }
+
   @override
   void dispose() {
     _scrollCtrl.dispose();
+    _textCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasContent =
-        widget.messages.isNotEmpty || widget.interimText.isNotEmpty;
+    final hasContent = widget.messages.isNotEmpty || widget.interimText.isNotEmpty;
 
-    if (!hasContent) {
-      return const _EmptyHint();
-    }
+    return Column(
+      children: [
+        Expanded(
+          child: !hasContent
+              ? const _EmptyHint()
+              : GlassCard(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  borderRadius: 24,
+                  glowColor: ThemeConfig.primary,
+                  glowRadius: 12,
+                  child: ListView.builder(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: widget.messages.length + (widget.interimText.isNotEmpty ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == widget.messages.length) {
+                        return _InterimBubble(text: widget.interimText);
+                      }
+                      final msg = widget.messages[index];
+                      return _MessageBubble(
+                        key: ValueKey('msg_$index'),
+                        role: msg.role,
+                        content: msg.content,
+                      );
+                    },
+                  ),
+                ),
+        ),
+        const SizedBox(height: 8),
 
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      borderRadius: 24,
-      glowColor: ThemeConfig.primary,
-      glowRadius: 12,
-      child: ListView.builder(
-        controller: _scrollCtrl,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
-        itemCount: widget.messages.length + (widget.interimText.isNotEmpty ? 1 : 0),
-        itemBuilder: (context, index) {
-          // Interim text bubble (at the end)
-          if (index == widget.messages.length) {
-            return _InterimBubble(text: widget.interimText);
-          }
-          final msg = widget.messages[index];
-          return _MessageBubble(
-            key: ValueKey('msg_$index'),
-            role: msg.role,
-            content: msg.content,
-          );
-        },
-      ),
+        // Text prompt bar
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: ThemeConfig.surface,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: ThemeConfig.border, width: 1),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  controller: _textCtrl,
+                  style: const TextStyle(color: ThemeConfig.textPrimary, fontSize: 13),
+                  onSubmitted: (_) => _handleSend(),
+                  decoration: const InputDecoration(
+                    hintText: 'Type prompt or ask FRIDAY…',
+                    hintStyle: TextStyle(color: ThemeConfig.textMuted, fontSize: 13),
+                    border: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: _handleSend,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: ThemeConfig.primary.withValues(alpha: 0.2),
+                  border: Border.all(color: ThemeConfig.primary.withValues(alpha: 0.5), width: 1),
+                ),
+                child: const Icon(Icons.send_rounded, color: ThemeConfig.primary, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -114,8 +169,7 @@ class _MessageBubble extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
-          mainAxisAlignment:
-              _isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          mainAxisAlignment: _isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             if (!_isUser) const _Avatar(isUser: false),
@@ -125,8 +179,7 @@ class _MessageBubble extends StatelessWidget {
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.of(context).size.width * 0.68,
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(18),
@@ -147,9 +200,7 @@ class _MessageBubble extends StatelessWidget {
                 child: Text(
                   content,
                   style: TextStyle(
-                    color: _isUser
-                        ? ThemeConfig.primary
-                        : ThemeConfig.textPrimary,
+                    color: _isUser ? ThemeConfig.primary : ThemeConfig.textPrimary,
                     fontSize: 14,
                     height: 1.4,
                   ),
@@ -246,10 +297,9 @@ class _EmptyHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+    return const Center(
       child: Text(
-        'Press the mic or power on to begin',
+        'Tap mic or type prompt below',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: ThemeConfig.textMuted,

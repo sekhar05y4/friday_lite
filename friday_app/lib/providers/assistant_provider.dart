@@ -187,7 +187,13 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> stopListening() async {
     if (_status != AssistantStatus.listening) return;
     await _speech.stopListening();
-    // SpeechFinishedEvent will fire automatically from SpeechService
+    _setStatus(AssistantStatus.idle);
+  }
+
+  /// Process typed input directly (for text chat mode).
+  Future<void> processTextInput(String text) async {
+    if (text.trim().isEmpty) return;
+    await _handleTranscript(text.trim());
   }
 
   /// Process a final transcript through the CommandRouter → TTS pipeline.

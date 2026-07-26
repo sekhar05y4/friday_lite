@@ -128,6 +128,7 @@ class SpeechService {
     _isListening = false;
     await _stt.stop();
     FridayLogger.log(LogCategory.speech, 'SpeechService: stopped (manual)');
+    EventBus.instance.fire(const SpeechFinishedEvent(''));
   }
 
   /// Cancel recognition without firing a result event.
