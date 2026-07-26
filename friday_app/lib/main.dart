@@ -28,6 +28,7 @@ import 'config/theme_config.dart';
 import 'core/automation_engine.dart';
 import 'core/friday_core.dart';
 import 'providers/assistant_provider.dart';
+import 'repositories/settings_repository.dart';
 import 'screens/home_screen.dart';
 import 'utils/logger.dart';
 
@@ -59,6 +60,9 @@ Future<void> main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
+
+  // ── Load persisted settings & ApiService base URL ─────────────────────
+  await SettingsRepository.instance.getBackendUrl();
 
   // ── FRIDAY Core initialisation ───────────────────────────────────────────
   // All local productivity & device feature modules registered for zero-latency routing.

@@ -1,70 +1,88 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../interfaces/repositories/i_settings_repository.dart';
 import '../config/api_config.dart';
-import '../services/database_service.dart';
+import '../interfaces/repositories/i_settings_repository.dart';
+import '../services/api_service.dart';
 import '../utils/logger.dart';
 
-/// Repository for persisting key-value settings.
-///
-/// Encapsulates storage for active backend URL, selected AI provider, voice rate, pitch, etc.
+/// Repository for persisting key-value settings via SharedPreferences & in-memory cache.
 class SettingsRepository implements ISettingsRepository {
-  SettingsRepository._();
+  SettingsRepository._() {
+    _initMemoryCache();
+  }
 
   static final SettingsRepository instance = SettingsRepository._();
 
-  /// Retrieve a setting value by key, returning [defaultValue] if not found.
+  String? _cachedBackendUrl;
+  String? _cachedAiProvider;
+
+  Future<void> _initMemoryCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _cachedBackendUrl = prefs.getString('backend_url') ?? ApiConfig.defaultBaseUrl;
+      _cachedAiProvider = prefs.getString('ai_provider') ?? 'gemini';
+      ApiService.instance.setBaseUrl(_cachedBackendUrl!);
+      FridayLogger.log(LogCategory.assistant, 'SettingsRepository: cache loaded backend_url=$_cachedBackendUrl');
+    } catch (e) {
+      FridayLogger.error(LogCategory.assistant, 'SettingsRepository init error: $e');
+    }
+  }
+
   @override
   Future<String> getString(String key, String defaultValue) async {
-    try {
-      final db = await DatabaseService.instance.database;
-      final rows = await db.query(
-        'settings',
-        columns: ['value'],
-        where: 'key = ?',
-        whereArgs: [key],
-      );
+    if (key == 'backend_url' && _cachedBackendUrl != null) return _cachedBackendUrl!;
+    if (key == 'ai_provider' && _cachedAiProvider != null) return _cachedAiProvider!;
 
-      if (rows.isNotEmpty) {
-        return rows.first['value'] as String;
-      }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(key) ?? defaultValue;
     } catch (e) {
       FridayLogger.error(LogCategory.assistant, 'SettingsRepository: error reading $key: $e');
     }
     return defaultValue;
   }
 
-  /// Set a setting key-value pair.
   @override
   Future<void> setString(String key, String value) async {
+    if (key == 'backend_url') {
+      _cachedBackendUrl = value;
+      ApiService.instance.setBaseUrl(value);
+    }
+    if (key == 'ai_provider') {
+      _cachedAiProvider = value;
+    }
+
     try {
-      final db = await DatabaseService.instance.database;
-      await db.insert(
-        'settings',
-        {'key': key, 'value': value},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      FridayLogger.log(LogCategory.assistant, 'SettingsRepository: set $key = $value');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+      FridayLogger.log(LogCategory.assistant, 'SettingsRepository: saved $key = $value');
     } catch (e) {
       FridayLogger.error(LogCategory.assistant, 'SettingsRepository: error writing $key: $e');
     }
   }
 
-  /// Helper to get the active backend URL.
   @override
-  Future<String> getBackendUrl() =>
-      getString('backend_url', ApiConfig.defaultBaseUrl);
+  Future<String> getBackendUrl() async {
+    if (_cachedBackendUrl != null) return _cachedBackendUrl!;
+    return getString('backend_url', ApiConfig.defaultBaseUrl);
+  }
 
-  /// Helper to set the active backend URL.
   @override
-  Future<void> setBackendUrl(String url) => setString('backend_url', url);
+  Future<void> setBackendUrl(String url) async {
+    _cachedBackendUrl = url;
+    ApiService.instance.setBaseUrl(url);
+    await setString('backend_url', url);
+  }
 
-  /// Helper to get the active AI provider ID.
   @override
-  Future<String> getAiProvider() => getString('ai_provider', 'gemini');
+  Future<String> getAiProvider() async {
+    if (_cachedAiProvider != null) return _cachedAiProvider!;
+    return getString('ai_provider', 'gemini');
+  }
 
-  /// Helper to set the active AI provider ID.
   @override
-  Future<void> setAiProvider(String providerId) =>
-      setString('ai_provider', providerId);
+  Future<void> setAiProvider(String providerId) async {
+    _cachedAiProvider = providerId;
+    await setString('ai_provider', providerId);
+  }
 }
