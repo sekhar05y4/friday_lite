@@ -3,7 +3,7 @@ import '../models/intent_result.dart';
 import '../services/api_service.dart';
 import '../utils/logger.dart';
 
-/// Gemini AI Provider implementation with Intelligent Normalizer & Offline Engine.
+/// Gemini AI Provider implementation with Generative Rule Engine & Offline Knowledge Base.
 class GeminiProvider implements IAIProvider {
   @override
   String get providerId => 'gemini';
@@ -48,48 +48,83 @@ class GeminiProvider implements IAIProvider {
     };
   }
 
-  /// Normalises stuttered/repeated speech input and generates dynamic offline answers.
+  /// Generates domain-specific, informative answers offline instead of repeating identity intros.
   String _generateOfflineFallback(String input) {
-    // 1. Clean and deduplicate repeated words (e.g. "whatwhatwhat canwhat can you" -> "what can you")
     final cleaned = input
-        .replaceAll(RegExp(r'([a-zA-Z]+)\1+'), r'$1')
+        .replaceAll(RegExp(r'([a-zA-Z]{3,})\1+'), r'$1')
         .replaceAll(RegExp(r'\b(\w+)(?:\s+\1)+\b', caseSensitive: false), r'$1')
         .toLowerCase()
         .trim();
 
-    FridayLogger.log(LogCategory.assistant, 'GeminiProvider normalized speech: "$cleaned"');
+    FridayLogger.log(LogCategory.assistant, 'GeminiProvider normalized query: "$cleaned"');
 
-    // ── Capabilities & What can you do ────────────────────────────────────
+    // ── 1. Capabilities & Feature Breakdown ───────────────────────────────────
     if (cleaned.contains('what can you do') ||
         cleaned.contains('what do you do') ||
         cleaned.contains('do for me') ||
         cleaned.contains('features') ||
         cleaned.contains('help') ||
         cleaned.contains('capabilities')) {
-      return "I can place phone calls, draft SMS messages, search contacts, launch apps, set reminders, manage your calendar & to-do list, control flashlight & device settings, scan QR/barcodes with Vision, store long-term memories, automate rules, and control smart home devices.";
+      return "Here is what I can do for you:\n"
+             "• Telephony: Make calls, draft SMS with voice confirmation, search contacts.\n"
+             "• Productivity: Set natural reminders, record voice notes, manage calendar agenda, alarms & to-do lists.\n"
+             "• Device Control: Flashlight, Wi-Fi, Bluetooth, Hotspot, Display brightness, Volume, DND.\n"
+             "• Camera Vision: Scan QR codes, barcodes, read text with OCR, detect faces & objects.\n"
+             "• Long-Term Memory: Store facts, preferences, knowledge, and task notes.\n"
+             "• Desktop Companion: Screenshot PC screen, volume, clipboard sync, execute terminal commands.\n"
+             "• Automation Engine & Smart Home: Trigger-condition rules, Matter, Zigbee, Home Assistant, Google, Alexa.";
     }
 
-    // ── Systems & Modules Count ───────────────────────────────────────────
-    if (cleaned.contains('system') ||
-        cleaned.contains('module') ||
-        cleaned.contains('how many')) {
-      return "FRIDAY Lite consists of 20 integrated local systems covering Telephony, Productivity, Device Control, Camera Vision, Long-Term Memory, Desktop Companion, Automation Engine, and Smart Home Platform.";
+    // ── 2. System Architecture & Module Breakdown ────────────────────────────
+    if (cleaned.contains('system') || cleaned.contains('module') || cleaned.contains('how many')) {
+      return "FRIDAY Lite consists of 20 integrated feature systems:\n"
+             "1. Phone Call Assistant  2. SMS Voice Assistant  3. Contacts Manager\n"
+             "4. Offline Calculator  5. Battery Monitor  6. Device Info & Diagnostics\n"
+             "7. Time & Date Engine  8. Voice Notes  9. Reminder Scheduler\n"
+             "10. Calendar Agenda  11. Alarm Manager  12. To-Do Checklist\n"
+             "13. Clipboard Manager  14. Flashlight & Settings  15. App Launcher\n"
+             "16. Camera Vision Platform  17. Long-Term Memory  18. Desktop Companion\n"
+             "19. Local LLM Provider  20. Automation Engine  21. Smart Home Platform";
     }
 
-    // ── Identity & Who are you ──────────────────────────────────────────────
-    if (cleaned.contains('who are you') ||
-        cleaned.contains('your name') ||
-        cleaned.contains('what is it') ||
-        cleaned.contains('what is this')) {
-      return "I am FRIDAY, your advanced AI assistant. I handle your daily tasks, phone calls, device controls, and smart home automation.";
+    // ── 3. Identity Queries ──────────────────────────────────────────────────
+    if (cleaned == 'who are you' || cleaned == 'what is your name' || cleaned == 'who made you') {
+      return "I am FRIDAY, your personal AI assistant. I am built with Flutter Clean Architecture and an offline-first command router to assist you with daily tasks, productivity, device controls, and smart home automation.";
     }
 
-    // ── Greetings ─────────────────────────────────────────────────────────
-    if (cleaned.startsWith('hi') || cleaned.startsWith('hello') || cleaned.startsWith('hey')) {
-      return "Hello! I am online and ready to assist you.";
+    // ── 4. Instructions / How to Use ──────────────────────────────────────────
+    if (cleaned.startsWith('how to') || cleaned.startsWith('how do i')) {
+      if (cleaned.contains('call') || cleaned.contains('message') || cleaned.contains('sms')) {
+        return "To make a call or send SMS, say 'Call Mom' or 'Message Dad I will be late'. I will verify permissions and ask for your confirmation before sending.";
+      }
+      if (cleaned.contains('remind') || cleaned.contains('note') || cleaned.contains('calendar')) {
+        return "To set reminders or notes, say 'Remind me tomorrow morning at 8 AM to pick up dry cleaning' or 'Note buy coffee'.";
+      }
+      if (cleaned.contains('scan') || cleaned.contains('vision') || cleaned.contains('camera')) {
+        return "Open Settings → Camera Vision Platform to scan QR codes, barcodes, extract text via OCR, or perform object detection.";
+      }
+      return "You can issue direct voice commands or type prompts in the chat box below. Check Settings → Integrated Feature Modules to explore all 20 modules.";
     }
 
-    // ── Time & Date ───────────────────────────────────────────────────────
+    // ── 5. Math & Conversions ────────────────────────────────────────────────
+    if (RegExp(r'\d+\s*[\+\-\*\/]\s*\d+').hasMatch(cleaned)) {
+      try {
+        final match = RegExp(r'(\d+)\s*([\+\-\*\/])\s*(\d+)').firstMatch(cleaned);
+        if (match != null) {
+          final n1 = double.parse(match.group(1)!);
+          final op = match.group(2)!;
+          final n2 = double.parse(match.group(3)!);
+          double res = 0;
+          if (op == '+') res = n1 + n2;
+          if (op == '-') res = n1 - n2;
+          if (op == '*') res = n1 * n2;
+          if (op == '/') res = n2 != 0 ? n1 / n2 : 0;
+          return "Calculation result: $n1 $op $n2 = ${res.toStringAsFixed(res.truncateToDouble() == res ? 0 : 2)}";
+        }
+      } catch (_) {}
+    }
+
+    // ── 6. Time & Date ───────────────────────────────────────────────────────
     if (cleaned.contains('time') || cleaned.contains('clock')) {
       final now = DateTime.now();
       final period = now.hour >= 12 ? 'PM' : 'AM';
@@ -103,8 +138,13 @@ class GeminiProvider implements IAIProvider {
       return "Today is ${months[now.month - 1]} ${now.day}, ${now.year}.";
     }
 
-    // ── Dynamic intelligent fallback for general queries ──────────────────
-    return "I understand you asked: '$cleaned'. All 20 local assistant modules are active. To connect to full Gemini cloud AI, ensure your phone and PC are on the same Wi-Fi and port 5000 is allowed in Windows Firewall.";
+    // ── 7. Greetings ─────────────────────────────────────────────────────────
+    if (cleaned.startsWith('hi') || cleaned.startsWith('hello') || cleaned.startsWith('hey')) {
+      return "Hello! How can I assist you today? All 20 local systems are online and ready.";
+    }
+
+    // ── 8. Informative Contextual Answer for Unrecognized General Prompts ─────
+    return "Regarding '$cleaned': All 20 local assistant modules are ready to execute commands. For full web search and cloud reasoning, test your server connection in Settings or switch to Local LLM mode.";
   }
 
   @override

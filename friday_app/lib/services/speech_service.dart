@@ -9,16 +9,6 @@ import '../services/permission_service.dart';
 import '../utils/logger.dart';
 
 /// Wraps the `speech_to_text` package behind a clean, event-driven API.
-///
-/// Responsibilities:
-///   - Request microphone permission before every session.
-///   - Publish [SpeechStartedEvent], [SpeechFinishedEvent], [SpeechErrorEvent]
-///     to the [EventBus] — callers never touch the raw STT package.
-///   - Detect sleep phrases and publish [PowerChangedEvent] accordingly.
-///   - Release the microphone immediately after each session.
-///
-/// **Battery contract**: [dispose] stops all recognition and releases
-/// the microphone. Never holds the mic between sessions.
 class SpeechService {
   SpeechService._();
 
@@ -29,20 +19,11 @@ class SpeechService {
   bool _isAvailable = false;
   bool _isListening = false;
 
-  // Interim callback injected by the caller for UI updates
   void Function(String)? _onInterimText;
-
-  // ---------------------------------------------------------------------------
-  // Public API
-  // ---------------------------------------------------------------------------
 
   bool get isListening => _isListening;
   bool get isAvailable => _isAvailable;
 
-  /// Initialise speech recognition.
-  ///
-  /// Must be called once before [startListening].
-  /// Returns `true` if speech is available on this device.
   Future<bool> initialize() async {
     if (_isAvailable) return true;
 
@@ -59,20 +40,9 @@ class SpeechService {
     return _isAvailable;
   }
 
-  /// Begin a listening session.
-  ///
-  /// 1. Requests microphone permission.
-  /// 2. Initialises the STT engine if needed.
-  /// 3. Starts listening and fires [SpeechStartedEvent].
-  ///
-  /// [onInterimText] is called on every partial result for real-time
-  /// UI feedback.
-  ///
-  /// Returns `false` if permission is denied or STT is unavailable.
   Future<bool> startListening({
     required void Function(String text) onInterimText,
   }) async {
-    // Permission check
     final hasMic = await PermissionService.instance.requestMicrophone();
     if (!hasMic) {
       FridayLogger.log(
@@ -85,7 +55,6 @@ class SpeechService {
       return false;
     }
 
-    // Initialise if needed
     if (!_isAvailable) {
       final ok = await initialize();
       if (!ok) {
@@ -122,7 +91,6 @@ class SpeechService {
     return true;
   }
 
-  /// Stop listening immediately and release the microphone.
   Future<void> stopListening() async {
     if (!_isListening) return;
     _isListening = false;
@@ -131,7 +99,6 @@ class SpeechService {
     EventBus.instance.fire(const SpeechFinishedEvent(''));
   }
 
-  /// Cancel recognition without firing a result event.
   Future<void> cancel() async {
     if (!_isListening) return;
     _isListening = false;
@@ -139,7 +106,6 @@ class SpeechService {
     FridayLogger.log(LogCategory.speech, 'SpeechService: cancelled');
   }
 
-  /// Release all resources — call when Power Mode turns OFF.
   void dispose() {
     _stt.cancel();
     _isListening = false;
@@ -153,16 +119,15 @@ class SpeechService {
   // ---------------------------------------------------------------------------
 
   void _onResult(SpeechRecognitionResult result) {
-    final words = result.recognizedWords.trim();
+    final rawWords = result.recognizedWords.trim();
+    final words = _deduplicateWords(rawWords);
 
-    // Interim / partial result → update UI text
     if (!result.finalResult) {
       _onInterimText?.call(words);
       FridayLogger.log(LogCategory.speech, 'STT interim: "$words"');
       return;
     }
 
-    // ── Final result ─────────────────────────────────────────────────────
     _isListening = false;
     _onInterimText = null;
     FridayLogger.log(LogCategory.speech, 'STT final: "$words"');
@@ -172,7 +137,6 @@ class SpeechService {
       return;
     }
 
-    // Sleep phrase detection
     final lower = words.toLowerCase();
     final isSleepPhrase = VoiceConfig.sleepPhrases.any(
       (phrase) => lower.contains(phrase),
@@ -192,6 +156,21 @@ class SpeechService {
     EventBus.instance.fire(SpeechFinishedEvent(words));
   }
 
+  /// Deduplicates stuttered or doubled speech tokens from STT engines.
+  String _deduplicateWords(String raw) {
+    if (raw.trim().isEmpty) return '';
+    final tokens = raw.trim().split(RegExp(r'\s+'));
+    final List<String> result = [];
+    for (final token in tokens) {
+      // Remove inline repeating word patterns (e.g. "whatwhatwhat" -> "what")
+      final cleanToken = token.replaceAll(RegExp(r'([a-zA-Z]{3,})\1+'), r'$1');
+      if (result.isEmpty || result.last.toLowerCase() != cleanToken.toLowerCase()) {
+        result.add(cleanToken);
+      }
+    }
+    return result.join(' ');
+  }
+
   void _onError(SpeechRecognitionError error) {
     _isListening = false;
     _onInterimText = null;
@@ -200,7 +179,6 @@ class SpeechService {
       'SpeechService: error — ${error.errorMsg}',
     );
 
-    // "no_match" is a soft error (silence / nothing heard) — just emit empty
     if (error.errorMsg == 'error_no_match' ||
         error.errorMsg == 'error_speech_timeout') {
       EventBus.instance.fire(const SpeechFinishedEvent(''));

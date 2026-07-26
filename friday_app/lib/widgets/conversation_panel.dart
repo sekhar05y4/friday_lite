@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../config/theme_config.dart';
 import '../providers/assistant_provider.dart';
 import 'glass_card.dart';
 
-/// Scrollable conversation panel showing recent exchange history
-/// plus an inline text prompt input field.
+/// Scrollable conversation panel supporting:
+///   - Message bubble copy on tap/long-press
+///   - One-tap paste button in input bar
+///   - Text & voice prompt routing
 class ConversationPanel extends StatefulWidget {
   final List<AssistantMessage> messages;
   final String interimText;
@@ -51,6 +54,27 @@ class _ConversationPanelState extends State<ConversationPanel> {
     context.read<AssistantProvider>().processTextInput(text);
   }
 
+  Future<void> _handlePaste() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data != null && data.text != null && data.text!.isNotEmpty) {
+      setState(() {
+        _textCtrl.text = data.text!;
+        _textCtrl.selection = TextSelection.fromPosition(
+          TextPosition(offset: _textCtrl.text.length),
+        );
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pasted from clipboard!'),
+            duration: Duration(seconds: 1),
+            backgroundColor: ThemeConfig.primary,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   void dispose() {
     _scrollCtrl.dispose();
@@ -93,7 +117,7 @@ class _ConversationPanelState extends State<ConversationPanel> {
         ),
         const SizedBox(height: 8),
 
-        // Text prompt bar
+        // Text prompt bar with Paste & Send buttons
         Row(
           children: [
             Expanded(
@@ -104,18 +128,30 @@ class _ConversationPanelState extends State<ConversationPanel> {
                   borderRadius: BorderRadius.circular(22),
                   border: Border.all(color: ThemeConfig.border, width: 1),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: _textCtrl,
-                  style: const TextStyle(color: ThemeConfig.textPrimary, fontSize: 13),
-                  onSubmitted: (_) => _handleSend(),
-                  decoration: const InputDecoration(
-                    hintText: 'Type prompt or ask FRIDAY…',
-                    hintStyle: TextStyle(color: ThemeConfig.textMuted, fontSize: 13),
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 12),
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.content_paste_rounded, size: 18),
+                      color: ThemeConfig.primary,
+                      tooltip: 'Paste from Clipboard',
+                      onPressed: _handlePaste,
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _textCtrl,
+                        style: const TextStyle(color: ThemeConfig.textPrimary, fontSize: 13),
+                        onSubmitted: (_) => _handleSend(),
+                        decoration: const InputDecoration(
+                          hintText: 'Type prompt or ask FRIDAY…',
+                          hintStyle: TextStyle(color: ThemeConfig.textMuted, fontSize: 13),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -153,6 +189,18 @@ class _MessageBubble extends StatelessWidget {
 
   bool get _isUser => role == 'user';
 
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: content));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Message copied to clipboard!'),
+        duration: Duration(seconds: 1),
+        backgroundColor: ThemeConfig.primary,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
@@ -175,34 +223,59 @@ class _MessageBubble extends StatelessWidget {
             if (!_isUser) const _Avatar(isUser: false),
             if (!_isUser) const SizedBox(width: 8),
             Flexible(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.of(context).size.width * 0.68,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(18),
-                    topRight: const Radius.circular(18),
-                    bottomLeft: Radius.circular(_isUser ? 18 : 4),
-                    bottomRight: Radius.circular(_isUser ? 4 : 18),
+              child: GestureDetector(
+                onLongPress: () => _copyToClipboard(context),
+                onDoubleTap: () => _copyToClipboard(context),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.68,
                   ),
-                  color: _isUser
-                      ? ThemeConfig.primary.withValues(alpha: 0.18)
-                      : ThemeConfig.surfaceElevated,
-                  border: Border.all(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: Radius.circular(_isUser ? 18 : 4),
+                      bottomRight: Radius.circular(_isUser ? 4 : 18),
+                    ),
                     color: _isUser
-                        ? ThemeConfig.primary.withValues(alpha: 0.35)
-                        : ThemeConfig.border,
-                    width: 1,
+                        ? ThemeConfig.primary.withValues(alpha: 0.18)
+                        : ThemeConfig.surfaceElevated,
+                    border: Border.all(
+                      color: _isUser
+                          ? ThemeConfig.primary.withValues(alpha: 0.35)
+                          : ThemeConfig.border,
+                      width: 1,
+                    ),
                   ),
-                ),
-                child: Text(
-                  content,
-                  style: TextStyle(
-                    color: _isUser ? ThemeConfig.primary : ThemeConfig.textPrimary,
-                    fontSize: 14,
-                    height: 1.4,
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 22),
+                        child: SelectableText(
+                          content,
+                          style: TextStyle(
+                            color: _isUser ? ThemeConfig.primary : ThemeConfig.textPrimary,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: InkWell(
+                          onTap: () => _copyToClipboard(context),
+                          child: Icon(
+                            Icons.copy_rounded,
+                            size: 14,
+                            color: _isUser
+                                ? ThemeConfig.primary.withValues(alpha: 0.6)
+                                : ThemeConfig.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
