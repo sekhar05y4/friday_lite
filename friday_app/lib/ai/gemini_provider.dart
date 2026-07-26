@@ -5,11 +5,8 @@ import '../utils/logger.dart';
 
 /// Gemini AI Provider implementation.
 ///
-/// Communicates with the Gemini model via the FRIDAY Flask backend's REST endpoints
-/// (`POST /intent` and `POST /chat`).
-///
-/// **Lazy initialisation**: network calls only happen when [detectIntent] or [chat]
-/// are explicitly invoked. Never initializes or consumes battery when idle.
+/// Communicates with Gemini model via FRIDAY Flask backend REST endpoints (`POST /intent` and `POST /chat`).
+/// Includes built-in Intelligent Fallback when the backend server is unreachable.
 class GeminiProvider implements IAIProvider {
   @override
   String get providerId => 'gemini';
@@ -19,14 +16,13 @@ class GeminiProvider implements IAIProvider {
     FridayLogger.log(LogCategory.api, 'GeminiProvider: sending chat prompt "$message"');
     try {
       final reply = await ApiService.instance.chat(message, history);
-      return reply.isNotEmpty ? reply : "I am connected to Gemini, but received an empty response.";
-    } on ApiException catch (e) {
-      FridayLogger.error(LogCategory.api, 'GeminiProvider API error: ${e.message}');
-      return "I could not reach Gemini AI. Error code: ${e.statusCode}.";
+      if (reply.isNotEmpty) return reply;
     } catch (e) {
       FridayLogger.error(LogCategory.api, 'GeminiProvider chat error: $e');
-      return "I could not reach the Gemini backend. Please check your connection.";
     }
+
+    // Intelligent Offline Fallback
+    return _generateOfflineFallback(message);
   }
 
   @override
@@ -34,30 +30,51 @@ class GeminiProvider implements IAIProvider {
     FridayLogger.log(LogCategory.api, 'GeminiProvider: detecting intent for "$input"');
     try {
       final IntentResult result = await ApiService.instance.detectIntent(input);
-      return {
-        'intent': result.intent,
-        'parameters': result.parameters,
-        'speech_response': result.speechResponse,
-        'confidence': result.confidence,
-        'requires_confirmation': result.requiresConfirmation,
-      };
-    } on ApiException catch (e) {
-      FridayLogger.error(LogCategory.api, 'GeminiProvider intent API error: ${e.message}');
-      return {
-        'intent': 'CHAT',
-        'parameters': {},
-        'speech_response': "I encountered an error processing your request with Gemini (HTTP ${e.statusCode}).",
-        'confidence': 0.0,
-      };
+      if (result.speechResponse.isNotEmpty) {
+        return {
+          'intent': result.intent,
+          'parameters': result.parameters,
+          'speech_response': result.speechResponse,
+          'confidence': result.confidence,
+          'requires_confirmation': result.requiresConfirmation,
+        };
+      }
     } catch (e) {
       FridayLogger.error(LogCategory.api, 'GeminiProvider detectIntent error: $e');
-      return {
-        'intent': 'CHAT',
-        'parameters': {},
-        'speech_response': "I am having trouble reaching the AI server right now.",
-        'confidence': 0.0,
-      };
     }
+
+    // Intelligent Offline Intent Fallback
+    final fallbackSpeech = _generateOfflineFallback(input);
+    return {
+      'intent': 'CHAT',
+      'parameters': {},
+      'speech_response': fallbackSpeech,
+      'confidence': 0.8,
+    };
+  }
+
+  String _generateOfflineFallback(String input) {
+    final lower = input.toLowerCase().trim();
+
+    if (lower.contains('hello') || lower.contains('hi') || lower.contains('hey')) {
+      return "Hello! I am FRIDAY. All local features, telephony, and device controls are active.";
+    }
+    if (lower.contains('who are you') || lower.contains('what is your name')) {
+      return "I am FRIDAY, your personal AI assistant.";
+    }
+    if (lower.contains('what is it') || lower.contains('what is this')) {
+      return "I am FRIDAY, an intelligent assistant designed to help with calls, apps, reminders, vision, smart home, and device control.";
+    }
+    if (lower.contains('time') || lower.contains('clock')) {
+      final now = DateTime.now();
+      return "The current time is ${now.hour}:${now.minute.toString().padLeft(2, '0')}.";
+    }
+    if (lower.contains('date') || lower.contains('day')) {
+      final now = DateTime.now();
+      return "Today is ${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}.";
+    }
+
+    return "I received your request: '$input'. Connect to FRIDAY backend or switch to Local LLM in Settings for full cloud AI reasoning.";
   }
 
   @override
