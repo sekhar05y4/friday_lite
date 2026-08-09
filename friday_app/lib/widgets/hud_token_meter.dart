@@ -4,8 +4,10 @@ import '../config/theme_config.dart';
 import '../models/telemetry_data.dart';
 import 'glass_card.dart';
 
-/// Sci-Fi HUD panel displaying connected networks, top active system processes,
-/// and live LLM token usage counters.
+/// Sci-Fi HUD panel displaying real-time Gemini API rate-limit quota metrics:
+///   - Tokens (This Request)
+///   - TPM (Tokens Per Minute) vs 250,000 limit
+///   - RPD (Requests Today) vs 1,500 limit
 class HudTokenMeter extends StatelessWidget {
   final TelemetryData data;
 
@@ -13,10 +15,6 @@ class HudTokenMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeNet = data.networks.isNotEmpty ? data.networks.first : 'Wi-Fi';
-    final topProcName = data.topApps.isNotEmpty ? data.topApps.first['name'].toString() : 'system';
-    final topProcMem = data.topApps.isNotEmpty ? '${data.topApps.first['memory_mb']}MB' : '256MB';
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GlassCard(
@@ -24,13 +22,30 @@ class HudTokenMeter extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Network & Top Process Status
+            // Current Request Tokens
             Row(
               children: [
-                const Icon(Icons.lan_rounded, size: 12, color: ThemeConfig.accent),
+                const Icon(Icons.token_rounded, size: 12, color: ThemeConfig.primary),
                 const SizedBox(width: 4),
                 Text(
-                  activeNet.toUpperCase(),
+                  'REQ: ${data.lastTotalTokens}',
+                  style: const TextStyle(
+                    color: ThemeConfig.primary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+
+            // TPM (Tokens Per Minute vs 250k)
+            Row(
+              children: [
+                const Icon(Icons.speed_rounded, size: 12, color: ThemeConfig.accent),
+                const SizedBox(width: 4),
+                Text(
+                  'TPM: ${data.tokensPerMin} / 250K',
                   style: const TextStyle(
                     color: ThemeConfig.accent,
                     fontSize: 10,
@@ -38,31 +53,21 @@ class HudTokenMeter extends StatelessWidget {
                     fontFamily: 'monospace',
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '• $topProcName ($topProcMem)',
-                  style: const TextStyle(
-                    color: ThemeConfig.textMuted,
-                    fontSize: 10,
-                    fontFamily: 'monospace',
-                  ),
-                ),
               ],
             ),
 
-            // Token Counter
+            // Requests Today (RPD vs 1,500)
             Row(
               children: [
-                const Icon(Icons.token_rounded, size: 12, color: ThemeConfig.primary),
+                const Icon(Icons.today_rounded, size: 12, color: ThemeConfig.statusListening),
                 const SizedBox(width: 4),
                 Text(
-                  'TOKENS: ${data.grandTotalTokens}',
+                  'RPD: ${data.requestsToday} / 1.5K',
                   style: const TextStyle(
-                    color: ThemeConfig.primary,
+                    color: ThemeConfig.statusListening,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                     fontFamily: 'monospace',
-                    letterSpacing: 0.8,
                   ),
                 ),
               ],

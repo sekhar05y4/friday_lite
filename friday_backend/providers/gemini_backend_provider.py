@@ -108,10 +108,18 @@ Respond ONLY with a JSON object in this format:
         return self.generate_chat_reply(message, history or [])
 
     def generate_chat_reply(self, message: str, history: List[Dict[str, str]]) -> str:
-        """Process multi-turn chat through Gemini or backend heuristic knowledge engine."""
+        """Process multi-turn chat through Gemini with full conversation context."""
         if self._is_configured:
             try:
-                chat_session = self.model.start_chat(history=[])
+                formatted_history = []
+                if history:
+                    for item in history:
+                        role = "user" if item.get("role") == "user" else "model"
+                        content = item.get("content", "")
+                        if content:
+                            formatted_history.append({"role": role, "parts": [content]})
+
+                chat_session = self.model.start_chat(history=formatted_history)
                 response = chat_session.send_message(message)
                 return response.text.strip()
             except Exception as e:
@@ -140,4 +148,4 @@ Respond ONLY with a JSON object in this format:
         if cleaned.startswith("hi") or cleaned.startswith("hello") or cleaned.startswith("hey"):
             return "Hello! I am online and ready to assist."
 
-        return f"Regarding '{message}': All 20 FRIDAY backend services and local modules are online and ready to execute your commands."
+        return f"Understood: '{message}'. All 20 FRIDAY backend services and local feature modules are active."

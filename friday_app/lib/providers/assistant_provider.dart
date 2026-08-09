@@ -9,72 +9,68 @@ import '../models/chat_message.dart';
 import '../models/command_result.dart';
 import '../repositories/chat_repository.dart';
 import '../services/speech_service.dart';
+import '../services/telemetry_service.dart';
 import '../services/tts_service.dart';
 import '../utils/logger.dart';
 
-/// Manages the assistant's conversational state and the complete voice pipeline.
-///
-/// ## Voice pipeline flow
-/// ```
-/// User taps mic
-///   └─► startListening()
-///         └─► SpeechService.startListening()
-///               └─► SpeechStartedEvent  → status = listening
-///               └─► SpeechFinishedEvent → _handleTranscript()
-///                     └─► FridayCore.route(transcript)
-///                           └─► CommandResult
-///                                 └─► TtsService.speak(response)
-///                                       └─► status = speaking
-///                                       └─► ConversationFinishedEvent
-///                                             └─► status = idle
-///                                             └─► auto-restart listening
-/// ```
-///
-/// ## Power Mode contract
-/// [PowerChangedEvent] OFF → immediately stops mic + TTS, resets status.
+/// Represents a single message in the assistant UI transcript log.
+class AssistantMessage {
+  final String role;
+  final String content;
+  final DateTime timestamp;
+
+  AssistantMessage({
+    required this.role,
+    required this.content,
+    DateTime? timestamp,
+  }) : timestamp = timestamp ?? DateTime.now();
+
+  bool get isUser => role == 'user';
+}
+
+enum AssistantStatus {
+  idle,
+  listening,
+  processing,
+  speaking,
+}
+
+/// Manages the assistant's conversational state and hands-free continuous voice pipeline.
 class AssistantProvider extends ChangeNotifier {
   AssistantProvider() {
     _subscribeToEvents();
   }
 
-  // Services (injected lazily — allocated only when power is ON)
   final SpeechService _speech = SpeechService.instance;
   final TtsService _tts = TtsService.instance;
 
   AssistantStatus _status = AssistantStatus.idle;
-  // ignore: prefer_final_fields — reassigned by STT interim results
   String _interimText = '';
   final List<AssistantMessage> _messages = [];
-
-  /// Controls whether the assistant automatically re-enters listening
-  /// after finishing a conversation turn.
   bool _autoListen = true;
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
-
-  // ---------------------------------------------------------------------------
-  // Public getters
-  // ---------------------------------------------------------------------------
 
   AssistantStatus get status => _status;
   String get interimText => _interimText;
   List<AssistantMessage> get messages => List.unmodifiable(_messages);
   bool get isListening => _status == AssistantStatus.listening;
-  bool get isProcessing => _status == AssistantStatus.processing;
-  bool get isSpeaking => _status == AssistantStatus.speaking;
   bool get autoListen => _autoListen;
 
-  set autoListen(bool value) {
-    _autoListen = value;
+  void _setStatus(AssistantStatus status) {
+    if (_status == status) return;
+    _status = status;
+    FridayLogger.log(LogCategory.assistant, 'AssistantStatus → ${status.name}');
     notifyListeners();
   }
 
-  // ---------------------------------------------------------------------------
-  // EventBus wiring
-  // ---------------------------------------------------------------------------
+  void addMessage({required String role, required String content}) {
+    _messages.add(AssistantMessage(role: role, content: content));
+    notifyListeners();
+    ChatRepository.instance.saveMessage(ChatMessage(role: role, content: content));
+  }
 
   void _subscribeToEvents() {
-    // ── Power changed ─────────────────────────────────────────────────────
     _subscriptions.add(
       EventBus.instance.on<PowerChangedEvent>().listen((event) {
         if (event.mode == PowerModeValue.off) {
@@ -85,14 +81,12 @@ class AssistantProvider extends ChangeNotifier {
       }),
     );
 
-    // ── Speech started ────────────────────────────────────────────────────
     _subscriptions.add(
       EventBus.instance.on<SpeechStartedEvent>().listen((_) {
         _setStatus(AssistantStatus.listening);
       }),
     );
 
-    // ── Speech finished ───────────────────────────────────────────────────
     _subscriptions.add(
       EventBus.instance.on<SpeechFinishedEvent>().listen((event) {
         _interimText = '';
@@ -100,32 +94,40 @@ class AssistantProvider extends ChangeNotifier {
         if (event.transcript.isNotEmpty) {
           _handleTranscript(event.transcript);
         } else {
-          // Nothing heard — return to idle
           _setStatus(AssistantStatus.idle);
+          if (_autoListen && FridayCore.instance.powerMode.isOn) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_status == AssistantStatus.idle && FridayCore.instance.powerMode.isOn) {
+                startListening();
+              }
+            });
+          }
         }
       }),
     );
 
-    // ── Speech error ──────────────────────────────────────────────────────
     _subscriptions.add(
       EventBus.instance.on<SpeechErrorEvent>().listen((event) {
         _interimText = '';
-        addMessage(role: 'assistant', content: event.message);
         _setStatus(AssistantStatus.idle);
+        if (_autoListen && FridayCore.instance.powerMode.isOn) {
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            if (_status == AssistantStatus.idle && FridayCore.instance.powerMode.isOn) {
+              startListening();
+            }
+          });
+        }
       }),
     );
 
-    // ── Conversation finished (TTS done) ──────────────────────────────────
     _subscriptions.add(
       EventBus.instance.on<ConversationFinishedEvent>().listen((_) {
         if (FridayCore.instance.powerMode.isOff) return;
         _setStatus(AssistantStatus.idle);
 
-        // Auto-restart listening for a hands-free experience
         if (_autoListen) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (FridayCore.instance.powerMode.isOn &&
-                _status == AssistantStatus.idle) {
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (FridayCore.instance.powerMode.isOn && _status == AssistantStatus.idle) {
               startListening();
             }
           });
@@ -134,42 +136,46 @@ class AssistantProvider extends ChangeNotifier {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Power mode reactions
-  // ---------------------------------------------------------------------------
+  void _handlePowerOn() {
+    _autoListen = true;
+    triggerWakeUpBriefing();
+  }
 
   void _handlePowerOff() {
-    FridayLogger.log(LogCategory.assistant, 'AssistantProvider: power OFF');
-    _speech.dispose();
-    _tts.dispose();
+    _speech.stopListening();
+    _tts.stop();
     _status = AssistantStatus.idle;
     _interimText = '';
     notifyListeners();
   }
 
-  void _handlePowerOn() {
-    FridayLogger.log(LogCategory.assistant, 'AssistantProvider: power ON');
-    _setStatus(AssistantStatus.idle);
-    // Initialise TTS eagerly so the first response has no delay
-    _tts.initialize();
+  /// Automated "Wake Up FRIDAY" Voice Briefing Routine
+  Future<void> triggerWakeUpBriefing() async {
+    if (FridayCore.instance.powerMode.isOff) return;
+
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? "Good morning, Boss."
+        : (hour < 17 ? "Good afternoon, Boss." : "Good evening, Boss.");
+
+    final telemetry = TelemetryService.instance.data;
+    final cpu = telemetry.cpuUsage.toStringAsFixed(0);
+    final ramUsed = telemetry.ramUsedGb.toStringAsFixed(1);
+    final ramTotal = telemetry.ramTotalGb.toStringAsFixed(0);
+    final bat = telemetry.batteryPercent;
+    final chargingStr = telemetry.isCharging ? "charging" : "discharging";
+    final topApp = telemetry.topApps.isNotEmpty ? telemetry.topApps.first['name'].toString() : 'System';
+    final net = telemetry.networks.isNotEmpty ? telemetry.networks.first : 'Wi-Fi';
+
+    final briefingText = "$greeting All systems operational. CPU load is at $cpu percent. RAM usage is $ramUsed out of $ramTotal gigabytes. Battery is at $bat percent and $chargingStr. Active processes include $topApp. Connection verified on $net.";
+
+    _autoListen = true;
+    await speak(briefingText);
   }
 
-  // ---------------------------------------------------------------------------
-  // Voice pipeline
-  // ---------------------------------------------------------------------------
-
-  /// Start a listening session.
-  ///
-  /// Requests microphone permission, initialises STT, and begins listening.
   Future<void> startListening() async {
     if (FridayCore.instance.powerMode.isOff) return;
     if (_status == AssistantStatus.listening) return;
-    if (_status == AssistantStatus.processing ||
-        _status == AssistantStatus.speaking) {
-      return;
-    }
-
-    FridayLogger.log(LogCategory.speech, 'AssistantProvider: startListening');
 
     final started = await _speech.startListening(
       onInterimText: (text) {
@@ -183,63 +189,50 @@ class AssistantProvider extends ChangeNotifier {
     }
   }
 
-  /// Stop listening manually.
   Future<void> stopListening() async {
-    if (_status != AssistantStatus.listening) return;
-    await _speech.stopListening();
+    _autoListen = false;
+    if (_status == AssistantStatus.listening) {
+      await _speech.stopListening();
+    }
     _setStatus(AssistantStatus.idle);
   }
 
-  /// Process typed input directly (for text chat mode).
   Future<void> processTextInput(String text) async {
     if (text.trim().isEmpty) return;
     await _handleTranscript(text.trim());
   }
 
-  /// Process a final transcript through the CommandRouter → TTS pipeline.
   Future<void> _handleTranscript(String transcript) async {
     if (FridayCore.instance.powerMode.isOff) return;
 
-    FridayLogger.log(
-      LogCategory.assistant,
-      'AssistantProvider: routing "$transcript"',
-    );
+    final lower = transcript.toLowerCase();
+    if (lower.contains('wake up friday') || lower.contains('hey friday') || lower.contains('wake up')) {
+      addMessage(role: 'user', content: transcript);
+      await triggerWakeUpBriefing();
+      return;
+    }
 
-    // Add user message to transcript
     addMessage(role: 'user', content: transcript);
-
-    // Set processing state
     _setStatus(AssistantStatus.processing);
 
-    // Route through CommandRouter (local-first)
     final result = await FridayCore.instance.route(transcript);
 
     if (FridayCore.instance.powerMode.isOff) return;
 
-    final response = result?.speechResponse ??
-        "I'm sorry, I couldn't process that request.";
+    final response = result?.speechResponse ?? "I'm sorry, I couldn't process that request.";
 
-    // Add assistant reply to transcript
     addMessage(role: 'assistant', content: response);
 
-    // Fire ActionExecutedEvent for any other subscribers
     EventBus.instance.fire(ActionExecutedEvent(
       moduleId: 'assistant',
       success: result != null,
       speechResponse: response,
     ));
 
-    // Speak the response
     _setStatus(AssistantStatus.speaking);
     await _tts.speak(response);
-    // ConversationFinishedEvent fires from TtsService on completion
   }
 
-  // ---------------------------------------------------------------------------
-  // Manual speak (for system messages)
-  // ---------------------------------------------------------------------------
-
-  /// Speak a message without going through the CommandRouter.
   Future<void> speak(String text) async {
     if (FridayCore.instance.powerMode.isOff) return;
     addMessage(role: 'assistant', content: text);
@@ -247,68 +240,11 @@ class AssistantProvider extends ChangeNotifier {
     await _tts.speak(text);
   }
 
-  // ---------------------------------------------------------------------------
-  // Transcript management
-  // ---------------------------------------------------------------------------
-
-  void addMessage({required String role, required String content}) {
-    final msg = AssistantMessage(role: role, content: content);
-    _messages.add(msg);
-    notifyListeners();
-    // Persist in Memory Repository / ChatRepository
-    ChatRepository.instance.saveMessage(
-      ChatMessage(role: role, content: content),
-    );
-  }
-
-  void clearMessages() {
-    _messages.clear();
-    notifyListeners();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Internal
-  // ---------------------------------------------------------------------------
-
-  void _setStatus(AssistantStatus status) {
-    if (_status == status) return;
-    _status = status;
-    notifyListeners();
-  }
-
   @override
   void dispose() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
+    for (final s in _subscriptions) {
+      s.cancel();
     }
-    _subscriptions.clear();
-    _speech.dispose();
-    _tts.dispose();
     super.dispose();
   }
-}
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/// Current operational status of the assistant voice pipeline.
-enum AssistantStatus {
-  idle,
-  listening,
-  processing,
-  speaking,
-}
-
-/// A single conversation entry.
-class AssistantMessage {
-  final String role;
-  final String content;
-  final DateTime timestamp;
-
-  AssistantMessage({
-    required this.role,
-    required this.content,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
 }

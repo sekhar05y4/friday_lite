@@ -15,7 +15,7 @@ import '../widgets/power_button.dart';
 import '../widgets/status_badge.dart';
 import 'settings_screen.dart';
 
-/// The primary assistant interface — Jarvis Sci-Fi HUD Dashboard.
+/// Primary assistant interface — High-Tech Sci-Fi Jarvis HUD Dashboard.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -36,6 +36,28 @@ class HomeScreen extends StatelessWidget {
       centerTitle: true,
       title: _FridayTitle(),
       actions: [
+        // Voice Briefing Trigger
+        IconButton(
+          icon: const Icon(Icons.campaign_rounded),
+          color: ThemeConfig.accent,
+          tooltip: 'Wake Up Voice Briefing',
+          onPressed: () {
+            context.read<AssistantProvider>().triggerWakeUpBriefing();
+          },
+        ),
+
+        // Global Copy Chat Log
+        IconButton(
+          icon: const Icon(Icons.copy_all_rounded),
+          color: ThemeConfig.primary,
+          tooltip: 'Copy Chat Log',
+          onPressed: () {
+            final msgs = context.read<AssistantProvider>().messages;
+            ConversationPanel.copyFullChatLog(context, msgs);
+          },
+        ),
+
+        // Settings & Diagnostics
         IconButton(
           icon: const Icon(Icons.tune_rounded),
           color: ThemeConfig.textSecondary,
@@ -45,7 +67,7 @@ class HomeScreen extends StatelessWidget {
             MaterialPageRoute(builder: (_) => const SettingsScreen()),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 4),
       ],
     );
   }
@@ -74,8 +96,8 @@ class _HomeBodyState extends State<_HomeBody> {
     if (isOn && !_wasOn) {
       _wasOn = true;
       final assistant = context.read<AssistantProvider>();
-      Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) assistant.speak('Hello. I am FRIDAY. System telemetry and AI core active.');
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) assistant.triggerWakeUpBriefing();
       });
     } else if (!isOn) {
       _wasOn = false;
@@ -111,7 +133,7 @@ class _HomeBodyState extends State<_HomeBody> {
             SafeArea(
               child: Column(
                 children: [
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
 
                   // ── Top Telemetry HUD Bar ──────────────────────────────
                   HudTelemetryBar(
@@ -119,9 +141,9 @@ class _HomeBodyState extends State<_HomeBody> {
                     isPoweredOn: isPoweredOn,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                  // ── Arc Reactor Voice Core ──────────────────────────────
+                  // ── Hologram Arc Reactor Core ─────────────────────────
                   Expanded(
                     flex: 5,
                     child: Center(
@@ -138,7 +160,7 @@ class _HomeBodyState extends State<_HomeBody> {
                     isPoweredOn: isPoweredOn,
                   ),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // ── Conversation panel ───────────────────────────────────
                   Expanded(
@@ -152,12 +174,12 @@ class _HomeBodyState extends State<_HomeBody> {
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
-                  // ── Bottom Token & Network Meter ────────────────────────
+                  // ── Bottom Token Meter & Rate Limits ────────────────────
                   HudTokenMeter(data: telemetryData),
 
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // ── Control bar ──────────────────────────────────────────
                   _ControlBar(
@@ -173,7 +195,7 @@ class _HomeBodyState extends State<_HomeBody> {
                     },
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -252,12 +274,12 @@ class _ControlBar extends StatelessWidget {
                 isOn: isPoweredOn,
                 onToggle: onPowerToggle,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 isPoweredOn ? 'TURN OFF' : 'TURN ON',
                 style: const TextStyle(
                   color: ThemeConfig.textMuted,
-                  fontSize: 10,
+                  fontSize: 9.5,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                 ),
@@ -273,12 +295,12 @@ class _ControlBar extends StatelessWidget {
                 status: status,
                 onPressed: onMicPressed,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 status == AssistantStatus.listening ? 'STOP' : 'SPEAK',
                 style: const TextStyle(
                   color: ThemeConfig.textMuted,
-                  fontSize: 10,
+                  fontSize: 9.5,
                   letterSpacing: 1.5,
                   fontWeight: FontWeight.w600,
                 ),
@@ -304,8 +326,8 @@ class _FridayTitle extends StatelessWidget {
         'F R I D A Y   H U D',
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
-              letterSpacing: 6,
-              fontSize: 16,
+              letterSpacing: 5,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
       ),

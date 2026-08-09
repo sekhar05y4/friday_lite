@@ -6,10 +6,10 @@ import '../config/theme_config.dart';
 import '../providers/assistant_provider.dart';
 import 'glass_card.dart';
 
-/// Scrollable conversation panel supporting:
+/// High-tech cybernetic conversation panel with:
 ///   - Message bubble copy on tap/long-press
+///   - Global chat transcript plain-text exporter
 ///   - One-tap paste button in input bar
-///   - Text & voice prompt routing
 class ConversationPanel extends StatefulWidget {
   final List<AssistantMessage> messages;
   final String interimText;
@@ -19,6 +19,39 @@ class ConversationPanel extends StatefulWidget {
     required this.messages,
     required this.interimText,
   });
+
+  /// Static helper to copy full formatted transcript to clipboard.
+  static void copyFullChatLog(BuildContext context, List<AssistantMessage> messages) {
+    if (messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chat log is empty.'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    for (final msg in messages) {
+      final hour = msg.timestamp.hour == 0 ? 12 : (msg.timestamp.hour > 12 ? msg.timestamp.hour - 12 : msg.timestamp.hour);
+      final period = msg.timestamp.hour >= 12 ? 'PM' : 'AM';
+      final min = msg.timestamp.minute.toString().padLeft(2, '0');
+      final timeStr = "$hour:$min $period";
+      final sender = msg.isUser ? "User" : "FRIDAY";
+      buffer.writeln("[$timeStr] $sender: ${msg.content}");
+    }
+
+    Clipboard.setData(ClipboardData(text: buffer.toString().trim()));
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Full chat log copied to clipboard!'),
+        duration: Duration(seconds: 2),
+        backgroundColor: ThemeConfig.primary,
+      ),
+    );
+  }
 
   @override
   State<ConversationPanel> createState() => _ConversationPanelState();
@@ -126,7 +159,7 @@ class _ConversationPanelState extends State<ConversationPanel> {
                 decoration: BoxDecoration(
                   color: ThemeConfig.surface,
                   borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: ThemeConfig.border, width: 1),
+                  border: Border.all(color: ThemeConfig.primary.withValues(alpha: 0.4), width: 1),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Row(
@@ -165,7 +198,7 @@ class _ConversationPanelState extends State<ConversationPanel> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: ThemeConfig.primary.withValues(alpha: 0.2),
-                  border: Border.all(color: ThemeConfig.primary.withValues(alpha: 0.5), width: 1),
+                  border: Border.all(color: ThemeConfig.primary.withValues(alpha: 0.6), width: 1),
                 ),
                 child: const Icon(Icons.send_rounded, color: ThemeConfig.primary, size: 18),
               ),
@@ -228,23 +261,23 @@ class _MessageBubble extends StatelessWidget {
                 onDoubleTap: () => _copyToClipboard(context),
                 child: Container(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width * 0.68,
+                    maxWidth: MediaQuery.of(context).size.width * 0.72,
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18),
-                      topRight: const Radius.circular(18),
-                      bottomLeft: Radius.circular(_isUser ? 18 : 4),
-                      bottomRight: Radius.circular(_isUser ? 4 : 18),
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(_isUser ? 16 : 2),
+                      bottomRight: Radius.circular(_isUser ? 2 : 16),
                     ),
                     color: _isUser
                         ? ThemeConfig.primary.withValues(alpha: 0.18)
                         : ThemeConfig.surfaceElevated,
                     border: Border.all(
                       color: _isUser
-                          ? ThemeConfig.primary.withValues(alpha: 0.35)
-                          : ThemeConfig.border,
+                          ? ThemeConfig.primary.withValues(alpha: 0.5)
+                          : ThemeConfig.accent.withValues(alpha: 0.35),
                       width: 1,
                     ),
                   ),
@@ -256,7 +289,8 @@ class _MessageBubble extends StatelessWidget {
                           content,
                           style: TextStyle(
                             color: _isUser ? ThemeConfig.primary : ThemeConfig.textPrimary,
-                            fontSize: 14,
+                            fontSize: 13.5,
+                            fontFamily: 'monospace',
                             height: 1.4,
                           ),
                         ),
@@ -270,8 +304,8 @@ class _MessageBubble extends StatelessWidget {
                             Icons.copy_rounded,
                             size: 14,
                             color: _isUser
-                                ? ThemeConfig.primary.withValues(alpha: 0.6)
-                                : ThemeConfig.textMuted,
+                                ? ThemeConfig.primary.withValues(alpha: 0.7)
+                                : ThemeConfig.accent.withValues(alpha: 0.7),
                           ),
                         ),
                       ),
@@ -307,19 +341,20 @@ class _InterimBubble extends StatelessWidget {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
                 color: ThemeConfig.primary.withValues(alpha: 0.08),
                 border: Border.all(
-                  color: ThemeConfig.primary.withValues(alpha: 0.2),
+                  color: ThemeConfig.primary.withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
               child: Text(
                 text,
                 style: TextStyle(
-                  color: ThemeConfig.primary.withValues(alpha: 0.6),
-                  fontSize: 14,
+                  color: ThemeConfig.primary.withValues(alpha: 0.7),
+                  fontSize: 13.5,
                   fontStyle: FontStyle.italic,
+                  fontFamily: 'monospace',
                   height: 1.4,
                 ),
               ),
@@ -349,8 +384,8 @@ class _Avatar extends StatelessWidget {
             : ThemeConfig.accent.withValues(alpha: 0.2),
         border: Border.all(
           color: isUser
-              ? ThemeConfig.primary.withValues(alpha: 0.5)
-              : ThemeConfig.accent.withValues(alpha: 0.5),
+              ? ThemeConfig.primary.withValues(alpha: 0.6)
+              : ThemeConfig.accent.withValues(alpha: 0.6),
           width: 1,
         ),
       ),
@@ -372,12 +407,13 @@ class _EmptyHint extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Tap mic or type prompt below',
+        'Tap mic or say "Wake Up FRIDAY"',
         textAlign: TextAlign.center,
         style: TextStyle(
           color: ThemeConfig.textMuted,
           fontSize: 13,
-          letterSpacing: 0.3,
+          letterSpacing: 0.5,
+          fontFamily: 'monospace',
         ),
       ),
     );

@@ -1,4 +1,4 @@
-/// Represents real-time system performance telemetry and LLM token metrics.
+/// Represents real-time system performance telemetry and LLM token quota metrics.
 class TelemetryData {
   final double cpuUsage;
   final double ramPercent;
@@ -13,6 +13,11 @@ class TelemetryData {
   final int totalPromptTokens;
   final int totalCompletionTokens;
 
+  // Gemini Free Tier Rate Limit Counters
+  final int requestsPerMin;
+  final int tokensPerMin;
+  final int requestsToday;
+
   const TelemetryData({
     this.cpuUsage = 0.0,
     this.ramPercent = 0.0,
@@ -26,6 +31,9 @@ class TelemetryData {
     this.lastCompletionTokens = 0,
     this.totalPromptTokens = 0,
     this.totalCompletionTokens = 0,
+    this.requestsPerMin = 0,
+    this.tokensPerMin = 0,
+    this.requestsToday = 0,
   });
 
   int get lastTotalTokens => lastPromptTokens + lastCompletionTokens;
@@ -36,6 +44,9 @@ class TelemetryData {
     int lastCompletionTokens = 0,
     int totalPromptTokens = 0,
     int totalCompletionTokens = 0,
+    int requestsPerMin = 0,
+    int tokensPerMin = 0,
+    int requestsToday = 0,
   }) {
     final ram = json['ram_usage'] as Map<String, dynamic>? ?? {};
     final bat = json['battery'] as Map<String, dynamic>? ?? {};
@@ -55,6 +66,9 @@ class TelemetryData {
       lastCompletionTokens: lastCompletionTokens,
       totalPromptTokens: totalPromptTokens,
       totalCompletionTokens: totalCompletionTokens,
+      requestsPerMin: requestsPerMin,
+      tokensPerMin: tokensPerMin,
+      requestsToday: requestsToday,
     );
   }
 
@@ -71,6 +85,9 @@ class TelemetryData {
     int? lastCompletionTokens,
     int? totalPromptTokens,
     int? totalCompletionTokens,
+    int? requestsPerMin,
+    int? tokensPerMin,
+    int? requestsToday,
   }) {
     return TelemetryData(
       cpuUsage: cpuUsage ?? this.cpuUsage,
@@ -85,6 +102,9 @@ class TelemetryData {
       lastCompletionTokens: lastCompletionTokens ?? this.lastCompletionTokens,
       totalPromptTokens: totalPromptTokens ?? this.totalPromptTokens,
       totalCompletionTokens: totalCompletionTokens ?? this.totalCompletionTokens,
+      requestsPerMin: requestsPerMin ?? this.requestsPerMin,
+      tokensPerMin: tokensPerMin ?? this.tokensPerMin,
+      requestsToday: requestsToday ?? this.requestsToday,
     );
   }
 }
