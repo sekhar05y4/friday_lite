@@ -136,9 +136,10 @@ class AssistantProvider extends ChangeNotifier {
     );
   }
 
+  bool _isBriefingInProgress = false;
+
   void _handlePowerOn() {
     _autoListen = true;
-    triggerWakeUpBriefing();
   }
 
   void _handlePowerOff() {
@@ -146,12 +147,15 @@ class AssistantProvider extends ChangeNotifier {
     _tts.stop();
     _status = AssistantStatus.idle;
     _interimText = '';
+    _isBriefingInProgress = false;
     notifyListeners();
   }
 
   /// Automated "Wake Up FRIDAY" Voice Briefing Routine
   Future<void> triggerWakeUpBriefing() async {
     if (FridayCore.instance.powerMode.isOff) return;
+    if (_isBriefingInProgress) return;
+    _isBriefingInProgress = true;
 
     final hour = DateTime.now().hour;
     final greeting = hour < 12
@@ -171,6 +175,7 @@ class AssistantProvider extends ChangeNotifier {
 
     _autoListen = true;
     await speak(briefingText);
+    _isBriefingInProgress = false;
   }
 
   Future<void> startListening() async {

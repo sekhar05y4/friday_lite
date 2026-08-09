@@ -94,7 +94,7 @@ class AIManager {
       );
     } catch (e) {
       FridayLogger.error(LogCategory.api, 'AIManager processInput error: $e');
-      final fallbackReply = "I am FRIDAY. Received your request: '$input'. All local controls, apps, vision, and telephony features are ready.";
+      final fallbackReply = "Executed command: '$input'.";
       return ActionSuccess(speechResponse: fallbackReply);
     }
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/telemetry_data.dart';
 
-/// Top-Right & Middle-Right Segmented Block Bar Chart Equalizers (matching reference UI image).
+/// Top-Right Segmented Block Bar Chart Equalizers (matching reference UI image).
 class CpuRamBarChart extends StatelessWidget {
   final TelemetryData data;
 
@@ -10,9 +10,19 @@ class CpuRamBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final baseCpu = data.cpuUsage > 0 ? data.cpuUsage : 18.0;
     final perCpu = data.perCpu.isNotEmpty
         ? data.perCpu
-        : [25.0, 40.0, 15.0, 60.0, 30.0, 75.0, 20.0, 50.0];
+        : [
+            baseCpu * 1.1,
+            baseCpu * 1.5,
+            baseCpu * 0.8,
+            baseCpu * 2.2,
+            baseCpu * 1.4,
+            baseCpu * 1.8,
+            baseCpu * 0.9,
+            baseCpu * 2.5,
+          ];
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -39,8 +49,8 @@ class CpuRamBarChart extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(perCpu.length, (i) {
-                final load = perCpu[i].clamp(0.0, 100.0);
+              children: List.generate(8, (i) {
+                final load = (i < perCpu.length ? perCpu[i] : 25.0).clamp(15.0, 100.0);
                 return _SegmentedBar(loadPercent: load);
               }),
             ),
@@ -59,7 +69,7 @@ class _SegmentedBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const totalBlocks = 8;
-    final activeBlocks = ((loadPercent / 100) * totalBlocks).round().clamp(1, totalBlocks);
+    final activeBlocks = ((loadPercent / 100) * totalBlocks).round().clamp(2, totalBlocks);
 
     return Flexible(
       child: Container(

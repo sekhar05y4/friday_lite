@@ -2,16 +2,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../config/animation_config.dart';
-import '../config/theme_config.dart';
 import '../providers/assistant_provider.dart';
 
-/// Futuristic Jarvis-Style Arc Reactor Core.
+/// Futuristic Sci-Fi Arc Reactor Core matching the reference infographic UI.
 ///
 /// Features:
-///   - Concentric HUD tech rings with tick marks
-///   - Clockwise & counter-clockwise rotating energy arcs
-///   - Reactive multi-layered glow aura (Cyan, Gold, Purple, Green)
-///   - Crisp Sci-Fi central reactor core
+///   - Crisp hollow neon-cyan HUD concentric rings
+///   - 36-tick outer radial measurement ring
+///   - Rotating white and cyan arc segments
+///   - Diagonal corner crosshairs
 class GlowingOrb extends StatefulWidget {
   final AssistantStatus status;
   final double size;
@@ -26,8 +25,7 @@ class GlowingOrb extends StatefulWidget {
   State<GlowingOrb> createState() => _GlowingOrbState();
 }
 
-class _GlowingOrbState extends State<GlowingOrb>
-    with TickerProviderStateMixin {
+class _GlowingOrbState extends State<GlowingOrb> with TickerProviderStateMixin {
   late AnimationController _breathController;
   late Animation<double> _breathAnim;
 
@@ -36,8 +34,8 @@ class _GlowingOrbState extends State<GlowingOrb>
 
   late AnimationController _colorController;
 
-  List<Color> _fromColors = ThemeConfig.orbOff;
-  List<Color> _toColors = ThemeConfig.orbOff;
+  List<Color> _fromColors = const [Color(0xFF00F0FF), Color(0xFF00F0FF), Color(0xFF00FF88)];
+  List<Color> _toColors = const [Color(0xFF00F0FF), Color(0xFF00F0FF), Color(0xFF00FF88)];
 
   @override
   void initState() {
@@ -48,13 +46,13 @@ class _GlowingOrbState extends State<GlowingOrb>
       duration: _breathDuration(widget.status),
     )..repeat(reverse: true);
 
-    _breathAnim = Tween<double>(begin: 0.90, end: 1.05).animate(
+    _breathAnim = Tween<double>(begin: 0.94, end: 1.04).animate(
       CurvedAnimation(parent: _breathController, curve: Curves.easeInOut),
     );
 
     _rotController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),
+      duration: const Duration(seconds: 12),
     )..repeat();
 
     _rotAnim = Tween<double>(begin: 0, end: 2 * math.pi).animate(_rotController);
@@ -96,15 +94,15 @@ class _GlowingOrbState extends State<GlowingOrb>
   }
 
   List<Color> _colorsForStatus(AssistantStatus s) => switch (s) {
-        AssistantStatus.idle => ThemeConfig.orbOff,
-        AssistantStatus.listening => ThemeConfig.orbListening,
-        AssistantStatus.processing => ThemeConfig.orbProcessing,
-        AssistantStatus.speaking => ThemeConfig.orbSpeaking,
+        AssistantStatus.idle => const [Color(0xFF00F0FF), Color(0xFF00F0FF), Color(0xFF00FF88)],
+        AssistantStatus.listening => const [Color(0xFF00FF88), Color(0xFF00FF88), Color(0xFF00F0FF)],
+        AssistantStatus.processing => const [Color(0xFFE056FD), Color(0xFFE056FD), Color(0xFF00F0FF)],
+        AssistantStatus.speaking => const [Color(0xFF2ED573), Color(0xFF2ED573), Color(0xFF00FF88)],
       };
 
   Duration _breathDuration(AssistantStatus s) => switch (s) {
         AssistantStatus.idle => const Duration(milliseconds: 3000),
-        AssistantStatus.listening => const Duration(milliseconds: 800),
+        AssistantStatus.listening => const Duration(milliseconds: 900),
         AssistantStatus.processing => const Duration(milliseconds: 500),
         AssistantStatus.speaking => const Duration(milliseconds: 700),
       };
@@ -158,78 +156,84 @@ class _ArcReactorPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // --- 1. Outer Glow Aura ---
+    final cyanColor = colors[0];
+    final accentColor = colors[2];
+
+    // --- 1. Subtle Outer Cyan Glow Aura ---
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          colors[1].withValues(alpha: 0.22 * breathValue),
-          colors[0].withValues(alpha: 0.0),
+          cyanColor.withValues(alpha: 0.18 * breathValue),
+          Colors.transparent,
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, glowPaint);
 
-    // --- 2. Outer HUD Tick Ring ---
-    _drawHudTickRing(canvas, center, radius * 0.92, colors[1].withValues(alpha: 0.4));
+    // --- 2. Diagonal HUD Corner Crosshair Rays ---
+    _drawDiagonalCrosshairs(canvas, center, radius, cyanColor.withValues(alpha: 0.5));
 
-    // --- 3. Rotating Outer Arc Segments ---
+    // --- 3. Outer 36-Tick Measurement Ring ---
+    _drawHudTickRing(canvas, center, radius * 0.90, cyanColor.withValues(alpha: 0.6));
+
+    // --- 4. Rotating Outer Segmented White/Cyan Arcs ---
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(-rotation * 0.8);
     canvas.translate(-center.dx, -center.dy);
-    _drawArcSegments(canvas, center, radius * 0.82, colors[1].withValues(alpha: 0.7));
+    _drawArcSegments(canvas, center, radius * 0.82, Colors.white.withValues(alpha: 0.85), strokeWidth: 3.5);
     canvas.restore();
 
-    // --- 4. Rotating Inner Arc Segments ---
+    // --- 5. Rotating Inner Segmented Arcs ---
     canvas.save();
     canvas.translate(center.dx, center.dy);
     canvas.rotate(rotation * 1.2);
     canvas.translate(-center.dx, -center.dy);
-    _drawArcSegments(canvas, center, radius * 0.68, colors[2].withValues(alpha: 0.8));
+    _drawArcSegments(canvas, center, radius * 0.68, cyanColor.withValues(alpha: 0.9), strokeWidth: 3.0);
     canvas.restore();
 
-    // --- 5. Inner Concentric Ring ---
+    // --- 6. Inner Concentric Ring ---
     final innerRingPaint = Paint()
-      ..color = colors[1].withValues(alpha: 0.5)
+      ..color = cyanColor.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-    canvas.drawCircle(center, radius * 0.58, innerRingPaint);
+    canvas.drawCircle(center, radius * 0.54, innerRingPaint);
 
-    // --- 6. Core Reactor Orb ---
-    final corePaint = Paint()
+    // --- 7. Transparent Core Aura (Hollow - NO DARK SPHERE) ---
+    final coreAuraPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          colors[1].withValues(alpha: 0.95),
-          colors[0].withValues(alpha: 0.85),
-          colors[2].withValues(alpha: 0.7),
+          cyanColor.withValues(alpha: 0.35 * breathValue),
+          cyanColor.withValues(alpha: 0.05),
         ],
-        stops: const [0.0, 0.45, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.46));
-    canvas.drawCircle(center, radius * 0.46, corePaint);
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.42));
+    canvas.drawCircle(center, radius * 0.42, coreAuraPaint);
 
-    // --- 7. Core Highlight ---
-    final highlightPaint = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-0.35, -0.35),
-        colors: [
-          Colors.white.withValues(alpha: 0.35),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.46));
-    canvas.drawCircle(center, radius * 0.46, highlightPaint);
-
-    // --- 8. Core Border & Tri-Arc Crosshairs ---
+    // --- 8. Core Border & Inner Crosshair Target ---
     final borderPaint = Paint()
-      ..color = colors[1].withValues(alpha: 0.8)
+      ..color = cyanColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
-    canvas.drawCircle(center, radius * 0.46, borderPaint);
+    canvas.drawCircle(center, radius * 0.42, borderPaint);
 
-    _drawCrosshairs(canvas, center, radius * 0.46, colors[1]);
+    _drawCenterTargetCrosshair(canvas, center, radius * 0.42, accentColor);
 
-    // --- 9. Sound Wave Waves (Speaking Mode) ---
+    // --- 9. Sound Wave Rings (Speaking Mode) ---
     if (status == AssistantStatus.speaking) {
-      _drawWaveRings(canvas, center, radius, colors[1]);
+      _drawWaveRings(canvas, center, radius, cyanColor);
     }
+  }
+
+  void _drawDiagonalCrosshairs(Canvas canvas, Offset center, double radius, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0;
+
+    final diag = radius * 0.96;
+    final cos45 = math.cos(math.pi / 4) * diag;
+    final sin45 = math.sin(math.pi / 4) * diag;
+
+    canvas.drawLine(Offset(center.dx - cos45, center.dy - sin45), Offset(center.dx + cos45, center.dy + sin45), paint);
+    canvas.drawLine(Offset(center.dx - cos45, center.dy + sin45), Offset(center.dx + cos45, center.dy - sin45), paint);
   }
 
   void _drawHudTickRing(Canvas canvas, Offset center, double r, Color color) {
@@ -242,16 +246,16 @@ class _ArcReactorPainter extends CustomPainter {
     for (int i = 0; i < count; i++) {
       final angle = (i * 360 / count) * math.pi / 180;
       final p1 = Offset(center.dx + r * math.cos(angle), center.dy + r * math.sin(angle));
-      final p2 = Offset(center.dx + (r - 6) * math.cos(angle), center.dy + (r - 6) * math.sin(angle));
+      final p2 = Offset(center.dx + (r - 7) * math.cos(angle), center.dy + (r - 7) * math.sin(angle));
       canvas.drawLine(p1, p2, paint);
     }
   }
 
-  void _drawArcSegments(Canvas canvas, Offset center, double r, Color color) {
+  void _drawArcSegments(Canvas canvas, Offset center, double r, Color color, {double strokeWidth = 3.0}) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
+      ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
     final rect = Rect.fromCircle(center: center, radius: r);
@@ -260,22 +264,21 @@ class _ArcReactorPainter extends CustomPainter {
     canvas.drawArc(rect, 4 * math.pi / 3, math.pi / 3, false, paint);
   }
 
-  void _drawCrosshairs(Canvas canvas, Offset center, double r, Color color) {
+  void _drawCenterTargetCrosshair(Canvas canvas, Offset center, double r, Color color) {
     final paint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..strokeWidth = 1.0;
+      ..color = color
+      ..strokeWidth = 1.5;
 
-    canvas.drawLine(Offset(center.dx - r - 4, center.dy), Offset(center.dx - r + 8, center.dy), paint);
-    canvas.drawLine(Offset(center.dx + r - 8, center.dy), Offset(center.dx + r + 4, center.dy), paint);
-    canvas.drawLine(Offset(center.dx, center.dy - r - 4), Offset(center.dx, center.dy - r + 8), paint);
-    canvas.drawLine(Offset(center.dx, center.dy + r - 8), Offset(center.dx, center.dy + r + 4), paint);
+    canvas.drawLine(Offset(center.dx - r * 0.6, center.dy), Offset(center.dx + r * 0.6, center.dy), paint);
+    canvas.drawLine(Offset(center.dx, center.dy - r * 0.6), Offset(center.dx, center.dy + r * 0.6), paint);
+    canvas.drawCircle(center, 4, Paint()..color = color);
   }
 
   void _drawWaveRings(Canvas canvas, Offset center, double radius, Color color) {
     for (int i = 1; i <= 3; i++) {
-      final ringRadius = radius * (0.50 + i * 0.12);
+      final ringRadius = radius * (0.45 + i * 0.15);
       final ringPaint = Paint()
-        ..color = color.withValues(alpha: (0.30 / i) * breathValue)
+        ..color = color.withValues(alpha: (0.35 / i) * breathValue)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
       canvas.drawCircle(center, ringRadius, ringPaint);
