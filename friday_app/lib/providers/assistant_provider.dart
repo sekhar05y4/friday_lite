@@ -96,8 +96,8 @@ class AssistantProvider extends ChangeNotifier {
         } else {
           _setStatus(AssistantStatus.idle);
           if (_autoListen && FridayCore.instance.powerMode.isOn) {
-            Future.delayed(const Duration(milliseconds: 500), () {
-              if (_status == AssistantStatus.idle && FridayCore.instance.powerMode.isOn) {
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (FridayCore.instance.powerMode.isOn) {
                 startListening();
               }
             });
@@ -111,8 +111,8 @@ class AssistantProvider extends ChangeNotifier {
         _interimText = '';
         _setStatus(AssistantStatus.idle);
         if (_autoListen && FridayCore.instance.powerMode.isOn) {
-          Future.delayed(const Duration(milliseconds: 1000), () {
-            if (_status == AssistantStatus.idle && FridayCore.instance.powerMode.isOn) {
+          Future.delayed(const Duration(milliseconds: 600), () {
+            if (FridayCore.instance.powerMode.isOn) {
               startListening();
             }
           });
@@ -126,8 +126,8 @@ class AssistantProvider extends ChangeNotifier {
         _setStatus(AssistantStatus.idle);
 
         if (_autoListen) {
-          Future.delayed(const Duration(milliseconds: 400), () {
-            if (FridayCore.instance.powerMode.isOn && _status == AssistantStatus.idle) {
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (FridayCore.instance.powerMode.isOn) {
               startListening();
             }
           });

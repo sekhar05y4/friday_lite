@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 from typing import Dict, Any, List
 from providers.i_backend_ai_provider import IBackendAIProvider
 from config.settings import config
@@ -12,6 +13,36 @@ try:
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
+
+
+def execute_os_command(cleaned: str) -> str:
+    """Execute real Windows OS process management commands."""
+    if any(phrase in cleaned for phrase in ["close youtube", "stop youtube", "close tabs", "tabs are not closed", "close chrome", "close browser", "close edge", "kill chrome"]):
+        try:
+            subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, capture_output=True)
+            subprocess.run("taskkill /F /IM msedge.exe /T", shell=True, capture_output=True)
+            subprocess.run("taskkill /F /IM firefox.exe /T", shell=True, capture_output=True)
+            return "Closed all Chrome and YouTube browser windows, Boss."
+        except Exception as e:
+            return f"Attempted process termination: {e}"
+
+    if "close notepad" in cleaned:
+        subprocess.run("taskkill /F /IM notepad.exe /T", shell=True, capture_output=True)
+        return "Closed Notepad application."
+
+    if "close calculator" in cleaned:
+        subprocess.run("taskkill /F /IM CalculatorApp.exe /T", shell=True, capture_output=True)
+        return "Closed Calculator application."
+
+    if "open notepad" in cleaned:
+        subprocess.run("start notepad", shell=True)
+        return "Opening Notepad application."
+
+    if "open calculator" in cleaned:
+        subprocess.run("start calc", shell=True)
+        return "Opening Calculator application."
+
+    return ""
 
 
 class GeminiBackendProvider(IBackendAIProvider):
@@ -50,20 +81,15 @@ class GeminiBackendProvider(IBackendAIProvider):
 
         cleaned = text.lower().strip()
 
-        # Direct OS System Executions
-        if "close youtube" in cleaned or "stop youtube" in cleaned:
-            try:
-                os.system("taskkill /f /im chrome.exe /fi \"windowtitle eq YouTube*\" >nul 2>&1")
-                os.system("taskkill /f /im msedge.exe >nul 2>&1")
-            except Exception:
-                pass
-            speech = "Closing YouTube process and media tabs now, Boss."
+        # Check for real OS system commands first
+        cmd_reply = execute_os_command(cleaned)
+        if cmd_reply:
             p_tokens = max(1, len(text) // 4)
-            c_tokens = max(1, len(speech) // 4)
+            c_tokens = max(1, len(cmd_reply) // 4)
             return {
-                "intent": "CLOSE_APP",
-                "parameters": {"app": "YouTube"},
-                "speech_response": speech,
+                "intent": "SYSTEM_CONTROL",
+                "parameters": {"command": text},
+                "speech_response": cmd_reply,
                 "confidence": 0.98,
                 "requires_confirmation": False,
                 "prompt_tokens": p_tokens,
@@ -132,16 +158,12 @@ Respond ONLY with a JSON object in this format:
         return self.generate_chat_reply(message, history or [])
 
     def generate_chat_reply(self, message: str, history: List[Dict[str, str]]) -> str:
-        """Process multi-turn chat through Gemini with full conversation context."""
+        """Process multi-turn chat through Gemini with real OS process execution."""
         cleaned = message.lower().strip()
 
-        if "close youtube" in cleaned or "stop youtube" in cleaned:
-            try:
-                os.system("taskkill /f /im chrome.exe /fi \"windowtitle eq YouTube*\" >nul 2>&1")
-                os.system("taskkill /f /im msedge.exe >nul 2>&1")
-            except Exception:
-                pass
-            return "Closing YouTube process and media tabs now, Boss."
+        cmd_reply = execute_os_command(cleaned)
+        if cmd_reply:
+            return cmd_reply
 
         if self._is_configured:
             try:

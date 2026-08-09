@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/telemetry_data.dart';
 
-/// Middle-Left Tech Status Badges & Radar Scanner Grid (matching reference UI image).
+/// Middle-Left Tech Status Badges displaying LIVE hardware performance telemetry (matching reference UI image).
 class TechStatusGrid extends StatelessWidget {
   final TelemetryData data;
 
@@ -11,6 +11,10 @@ class TechStatusGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final netName = data.networks.isNotEmpty ? data.networks.first : 'Wi-Fi';
+    final cpuStr = 'CPU: ${data.cpuUsage.toStringAsFixed(0)}%';
+    final ramStr = 'RAM: ${data.ramUsedGb.toStringAsFixed(1)} / ${data.ramTotalGb.toStringAsFixed(0)}G';
+    final pwrStr = 'PWR: ${data.batteryPercent}% ${data.isCharging ? "⚡" : "🔋"}';
+    final netStr = 'NET: $netName';
 
     return Container(
       padding: const EdgeInsets.all(8),
@@ -22,26 +26,26 @@ class TechStatusGrid extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 4 Figure Badges
-          const Row(
+          // 4 Live Telemetry Badges
+          Row(
             children: [
-              Expanded(child: _BadgeItem(title: 'FIGURE_01 ○', isActive: true)),
-              SizedBox(width: 4),
-              Expanded(child: _BadgeItem(title: 'FIGURE_03 □', isActive: true)),
+              Expanded(child: _BadgeItem(title: 'FIG_01 $cpuStr', isActive: true)),
+              const SizedBox(width: 4),
+              Expanded(child: _BadgeItem(title: 'FIG_03 $pwrStr', isActive: true)),
             ],
           ),
           const SizedBox(height: 4),
           Row(
             children: [
-              Expanded(child: _BadgeItem(title: 'FIGURE_02 ✕', isActive: data.isCharging)),
+              Expanded(child: _BadgeItem(title: 'FIG_02 $ramStr', isActive: true)),
               const SizedBox(width: 4),
-              const Expanded(child: _BadgeItem(title: 'FIGURE_04 △', isActive: true)),
+              Expanded(child: _BadgeItem(title: 'FIG_04 $netStr', isActive: true)),
             ],
           ),
 
           const SizedBox(height: 8),
 
-          // Target Scanner Box with concentric circles
+          // Target Scanner Box with live telemetry coordinates
           Expanded(
             child: Container(
               decoration: BoxDecoration(
@@ -56,8 +60,8 @@ class TechStatusGrid extends StatelessWidget {
                     child: const SizedBox.expand(),
                   ),
                   Positioned(
-                    left: 12,
-                    top: 12,
+                    left: 10,
+                    top: 10,
                     child: Row(
                       children: [
                         Container(
@@ -74,6 +78,7 @@ class TechStatusGrid extends StatelessWidget {
                           style: const TextStyle(
                             color: Color(0xFF00F0FF),
                             fontSize: 9,
+                            fontWeight: FontWeight.bold,
                             fontFamily: 'monospace',
                           ),
                         ),
@@ -81,13 +86,14 @@ class TechStatusGrid extends StatelessWidget {
                     ),
                   ),
                   Positioned(
-                    right: 12,
-                    bottom: 12,
+                    right: 10,
+                    bottom: 10,
                     child: Text(
-                      'CPU ${data.cpuUsage.toStringAsFixed(0)}%',
+                      'RAM ${data.ramPercent.toStringAsFixed(0)}% • CPU ${data.cpuUsage.toStringAsFixed(0)}%',
                       style: const TextStyle(
                         color: Color(0xFF00FF88),
                         fontSize: 9,
+                        fontWeight: FontWeight.bold,
                         fontFamily: 'monospace',
                       ),
                     ),
@@ -111,7 +117,7 @@ class _BadgeItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: isActive ? const Color(0x2000F0FF) : const Color(0x0A00F0FF),
         border: Border.all(
