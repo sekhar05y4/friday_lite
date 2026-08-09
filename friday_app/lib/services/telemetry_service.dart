@@ -76,7 +76,7 @@ class TelemetryService extends ChangeNotifier {
   Future<void> _fetchTelemetry() async {
     try {
       final res = await ApiService.instance.getTelemetry();
-      if (res.isNotEmpty) {
+      if (res.isNotEmpty && res['status'] == 'ok') {
         _pruneOldRateLimitEvents();
         final currentTpm = _tokenEvents.fold<int>(0, (sum, item) => sum + ((item['tokens'] as int?) ?? 0));
         _data = TelemetryData.fromJson(
@@ -91,14 +91,9 @@ class TelemetryService extends ChangeNotifier {
         );
         notifyListeners();
       }
-    } catch (_) {
-      _data = _data.copyWith(
-        cpuUsage: 14.2,
-        ramPercent: 52.1,
-        ramUsedGb: 8.3,
-        ramTotalGb: 16.0,
-      );
-      notifyListeners();
+    } catch (e) {
+      // Preserve live telemetry data during transient network polls — NO FAKE OVERRIDES
+      FridayLogger.log(LogCategory.assistant, 'TelemetryService poll error: $e');
     }
   }
 
