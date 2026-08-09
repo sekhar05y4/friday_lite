@@ -1,6 +1,7 @@
 /// Represents real-time system performance telemetry and LLM token quota metrics.
 class TelemetryData {
   final double cpuUsage;
+  final List<double> perCpu;
   final double ramPercent;
   final double ramUsedGb;
   final double ramTotalGb;
@@ -20,6 +21,7 @@ class TelemetryData {
 
   const TelemetryData({
     this.cpuUsage = 0.0,
+    this.perCpu = const [12.0, 8.5, 15.0, 6.2, 10.0, 14.5, 9.0, 11.2],
     this.ramPercent = 0.0,
     this.ramUsedGb = 0.0,
     this.ramTotalGb = 0.0,
@@ -52,9 +54,11 @@ class TelemetryData {
     final bat = json['battery'] as Map<String, dynamic>? ?? {};
     final appsRaw = json['top_apps'] as List<dynamic>? ?? [];
     final netsRaw = json['networks'] as List<dynamic>? ?? [];
+    final perCpuRaw = json['per_cpu'] as List<dynamic>? ?? [];
 
     return TelemetryData(
       cpuUsage: (json['cpu_usage'] as num?)?.toDouble() ?? 0.0,
+      perCpu: perCpuRaw.map((e) => (e as num).toDouble()).toList(),
       ramPercent: (ram['percent'] as num?)?.toDouble() ?? 0.0,
       ramUsedGb: (ram['used_gb'] as num?)?.toDouble() ?? 0.0,
       ramTotalGb: (ram['total_gb'] as num?)?.toDouble() ?? 0.0,
@@ -74,6 +78,7 @@ class TelemetryData {
 
   TelemetryData copyWith({
     double? cpuUsage,
+    List<double>? perCpu,
     double? ramPercent,
     double? ramUsedGb,
     double? ramTotalGb,
@@ -91,6 +96,7 @@ class TelemetryData {
   }) {
     return TelemetryData(
       cpuUsage: cpuUsage ?? this.cpuUsage,
+      perCpu: perCpu ?? this.perCpu,
       ramPercent: ramPercent ?? this.ramPercent,
       ramUsedGb: ramUsedGb ?? this.ramUsedGb,
       ramTotalGb: ramTotalGb ?? this.ramTotalGb,

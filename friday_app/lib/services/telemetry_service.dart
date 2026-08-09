@@ -5,7 +5,7 @@ import '../models/telemetry_data.dart';
 import '../services/api_service.dart';
 import '../utils/logger.dart';
 
-/// Service for background polling of system telemetry (/api/telemetry)
+/// Service for 1-second background polling of physical OS telemetry (/api/telemetry)
 /// and tracking real-time LLM token quota metrics (RPM, TPM, RPD).
 class TelemetryService extends ChangeNotifier {
   TelemetryService._();
@@ -20,14 +20,14 @@ class TelemetryService extends ChangeNotifier {
 
   TelemetryData get data => _data;
 
-  /// Start periodic telemetry updates (every 3 seconds).
+  /// Start periodic telemetry updates (every 1 second).
   void startPolling() {
     _pollingTimer?.cancel();
     _fetchTelemetry();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _fetchTelemetry();
     });
-    FridayLogger.log(LogCategory.assistant, 'TelemetryService: started polling');
+    FridayLogger.log(LogCategory.assistant, 'TelemetryService: started 1s polling');
   }
 
   /// Stop polling.

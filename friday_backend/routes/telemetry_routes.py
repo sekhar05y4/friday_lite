@@ -5,17 +5,18 @@ telemetry_bp = Blueprint("telemetry", __name__)
 
 @telemetry_bp.get("/api/telemetry")
 def get_telemetry():
-    """Returns real-time hardware OS telemetry metrics."""
+    """Returns real-time physical OS metrics (CPU, RAM, Per-Core CPU, Battery, Processes, Network)."""
     try:
-        # 1. Live CPU load calculated across all logical cores via psutil.cpu_percent(interval=0.2)
+        # 1. Overall CPU load & Per-Core CPU loads
         cpu_usage = psutil.cpu_percent(interval=0.2)
+        per_cpu = psutil.cpu_percent(interval=0.2, percpu=True)
 
-        # 2. Memory (RAM) using 1e9 scale
+        # 2. Physical Memory (RAM) using 1024**3 scale matching Task Manager
         mem = psutil.virtual_memory()
         ram_usage = {
             "percent": round(mem.percent, 1),
-            "used_gb": round(mem.used / 1e9, 2),
-            "total_gb": round(mem.total / 1e9, 2),
+            "used_gb": round(mem.used / (1024 ** 3), 1),
+            "total_gb": round(mem.total / (1024 ** 3), 1),
         }
 
         # 3. Battery status with graceful fallback
@@ -46,7 +47,7 @@ def get_telemetry():
 
             processes.sort(key=lambda x: x[1], reverse=True)
             top_apps = [
-                {"name": p[0], "memory_mb": round(p[1] / 1e6, 1)}
+                {"name": p[0], "memory_mb": round(p[1] / (1024 * 1024), 1)}
                 for p in processes[:5]
             ]
         except Exception:
@@ -65,6 +66,7 @@ def get_telemetry():
         return jsonify({
             "status": "ok",
             "cpu_usage": cpu_usage,
+            "per_cpu": per_cpu,
             "ram_usage": ram_usage,
             "battery": battery_data,
             "top_apps": top_apps,

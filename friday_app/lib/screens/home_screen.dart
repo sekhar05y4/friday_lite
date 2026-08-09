@@ -6,23 +6,26 @@ import '../core/friday_core.dart';
 import '../core/power_mode.dart';
 import '../providers/assistant_provider.dart';
 import '../services/telemetry_service.dart';
+import '../widgets/audio_waveform_widget.dart';
 import '../widgets/conversation_panel.dart';
+import '../widgets/cpu_ram_bar_chart.dart';
 import '../widgets/glowing_orb.dart';
-import '../widgets/hud_telemetry_bar.dart';
+import '../widgets/header_banner_widget.dart';
 import '../widgets/hud_token_meter.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/power_button.dart';
-import '../widgets/status_badge.dart';
+import '../widgets/radar_chart_widget.dart';
+import '../widgets/tech_status_grid.dart';
 import 'settings_screen.dart';
 
-/// Primary assistant interface — High-Tech Sci-Fi Jarvis HUD Dashboard.
+/// Primary interface — Sci-Fi HUD Infographic Dashboard matching reference UI image.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: ThemeConfig.background,
+      backgroundColor: const Color(0xFF071019),
       extendBodyBehindAppBar: true,
       appBar: _buildAppBar(context),
       body: _HomeBody(),
@@ -39,7 +42,7 @@ class HomeScreen extends StatelessWidget {
         // Voice Briefing Trigger
         IconButton(
           icon: const Icon(Icons.campaign_rounded),
-          color: ThemeConfig.accent,
+          color: const Color(0xFF00FF88),
           tooltip: 'Wake Up Voice Briefing',
           onPressed: () {
             context.read<AssistantProvider>().triggerWakeUpBriefing();
@@ -49,7 +52,7 @@ class HomeScreen extends StatelessWidget {
         // Global Copy Chat Log
         IconButton(
           icon: const Icon(Icons.copy_all_rounded),
-          color: ThemeConfig.primary,
+          color: const Color(0xFF00F0FF),
           tooltip: 'Copy Chat Log',
           onPressed: () {
             final msgs = context.read<AssistantProvider>().messages;
@@ -123,80 +126,130 @@ class _HomeBodyState extends State<_HomeBody> {
 
         return Stack(
           children: [
-            // Ambient background gradient
-            _AmbientBackground(
-              status: assistant.status,
-              isPoweredOn: isPoweredOn,
-            ),
+            // Dark Navy Grid Background
+            _SciFiGridBackground(status: assistant.status),
 
-            // Main Sci-Fi HUD content
             SafeArea(
-              child: Column(
-                children: [
-                  const SizedBox(height: 4),
-
-                  // ── Top Telemetry HUD Bar ──────────────────────────────
-                  HudTelemetryBar(
-                    data: telemetryData,
-                    isPoweredOn: isPoweredOn,
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // ── Hologram Arc Reactor Core ─────────────────────────
-                  Expanded(
-                    flex: 5,
-                    child: Center(
-                      child: GlowingOrb(
-                        status: assistant.status,
-                        size: MediaQuery.of(context).size.width * 0.58,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                child: Column(
+                  children: [
+                    // ── TOP ROW: Waveform | Header Banner | Per-Core CPU Chart ────
+                    SizedBox(
+                      height: 80,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: AudioWaveformWidget(status: assistant.status),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 4,
+                            child: HeaderBannerWidget(status: assistant.status),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 3,
+                            child: CpuRamBarChart(data: telemetryData),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
 
-                  // ── Status badge ─────────────────────────────────────────
-                  StatusBadge(
-                    status: assistant.status,
-                    isPoweredOn: isPoweredOn,
-                  ),
+                    const SizedBox(height: 8),
 
-                  const SizedBox(height: 8),
+                    // ── MIDDLE ROW: Tech Grid | Arc Reactor Core | Histogram Equalizer
+                    Expanded(
+                      flex: 6,
+                      child: Row(
+                        children: [
+                          // Left Tech Status Grid & Scanner
+                          Expanded(
+                            flex: 3,
+                            child: TechStatusGrid(data: telemetryData),
+                          ),
+                          const SizedBox(width: 8),
 
-                  // ── Conversation panel ───────────────────────────────────
-                  Expanded(
-                    flex: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                          // Center Arc Reactor HUD Core
+                          Expanded(
+                            flex: 4,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GlowingOrb(
+                                    status: assistant.status,
+                                    size: MediaQuery.of(context).size.width * 0.42,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'FRIDAY SYSTEM CONTROL',
+                                    style: TextStyle(
+                                      color: Color(0xFF00F0FF),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2.0,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Right Radar Spider Chart
+                          Expanded(
+                            flex: 3,
+                            child: RadarChartWidget(data: telemetryData),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 6),
+
+                    // ── CONVERSATION LOG PANEL ─────────────────────────────
+                    Expanded(
+                      flex: 4,
                       child: ConversationPanel(
                         messages: assistant.messages,
                         interimText: assistant.interimText,
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 6),
+                    const SizedBox(height: 4),
 
-                  // ── Bottom Token Meter & Rate Limits ────────────────────
-                  HudTokenMeter(data: telemetryData),
+                    // ── BOTTOM TOKEN METER ─────────────────────────────────
+                    HudTokenMeter(data: telemetryData),
 
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                  // ── Control bar ──────────────────────────────────────────
-                  _ControlBar(
-                    isPoweredOn: isPoweredOn,
-                    status: assistant.status,
-                    onPowerToggle: () => core.togglePower(),
-                    onMicPressed: () {
-                      if (assistant.status == AssistantStatus.listening) {
-                        assistant.stopListening();
-                      } else {
-                        assistant.startListening();
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 12),
-                ],
+                    // ── CONTROL BUTTONS ────────────────────────────────────
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        PowerButton(
+                          isOn: isPoweredOn,
+                          onToggle: () => core.togglePower(),
+                        ),
+                        MicButton(
+                          isPoweredOn: isPoweredOn,
+                          status: assistant.status,
+                          onPressed: () {
+                            if (assistant.status == AssistantStatus.listening) {
+                              assistant.stopListening();
+                            } else {
+                              assistant.startListening();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                ),
               ),
             ),
           ],
@@ -206,130 +259,59 @@ class _HomeBodyState extends State<_HomeBody> {
   }
 }
 
-class _AmbientBackground extends StatelessWidget {
+class _SciFiGridBackground extends StatelessWidget {
   final AssistantStatus status;
-  final bool isPoweredOn;
 
-  const _AmbientBackground({
-    required this.status,
-    required this.isPoweredOn,
-  });
-
-  Color get _ambientColor {
-    if (!isPoweredOn) return ThemeConfig.statusOff.withValues(alpha: 0.04);
-    return switch (status) {
-      AssistantStatus.idle => ThemeConfig.primary.withValues(alpha: 0.04),
-      AssistantStatus.listening =>
-        ThemeConfig.statusListening.withValues(alpha: 0.08),
-      AssistantStatus.processing =>
-        ThemeConfig.statusProcessing.withValues(alpha: 0.06),
-      AssistantStatus.speaking =>
-        ThemeConfig.statusSpeaking.withValues(alpha: 0.06),
-    };
-  }
+  const _SciFiGridBackground({required this.status});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 600),
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.2),
-          radius: 1.1,
-          colors: [
-            _ambientColor,
-            ThemeConfig.background,
-          ],
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF071019),
+        image: DecorationImage(
+          image: NetworkImage(''), // Clean solid dark backdrop
+          fit: BoxFit.cover,
         ),
+      ),
+      child: CustomPaint(
+        painter: _BackgroundGridPainter(),
+        child: const SizedBox.expand(),
       ),
     );
   }
 }
 
-class _ControlBar extends StatelessWidget {
-  final bool isPoweredOn;
-  final AssistantStatus status;
-  final VoidCallback onPowerToggle;
-  final VoidCallback onMicPressed;
+class _BackgroundGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final gridPaint = Paint()
+      ..color = const Color(0x0A00F0FF)
+      ..strokeWidth = 0.8;
 
-  const _ControlBar({
-    required this.isPoweredOn,
-    required this.status,
-    required this.onPowerToggle,
-    required this.onMicPressed,
-  });
+    for (double x = 0; x < size.width; x += 24) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
+    }
+    for (double y = 0; y < size.height; y += 24) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Power button
-          Column(
-            children: [
-              PowerButton(
-                isOn: isPoweredOn,
-                onToggle: onPowerToggle,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                isPoweredOn ? 'TURN OFF' : 'TURN ON',
-                style: const TextStyle(
-                  color: ThemeConfig.textMuted,
-                  fontSize: 9.5,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-
-          // Mic button (larger, centre)
-          Column(
-            children: [
-              MicButton(
-                isPoweredOn: isPoweredOn,
-                status: status,
-                onPressed: onMicPressed,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                status == AssistantStatus.listening ? 'STOP' : 'SPEAK',
-                style: const TextStyle(
-                  color: ThemeConfig.textMuted,
-                  fontSize: 9.5,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+  bool shouldRepaint(_BackgroundGridPainter old) => false;
 }
 
 class _FridayTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (bounds) => const LinearGradient(
-        colors: [ThemeConfig.primary, ThemeConfig.accent],
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-      ).createShader(bounds),
-      child: Text(
-        'F R I D A Y   H U D',
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              letterSpacing: 5,
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
+    return const Text(
+      'F R I D A Y   H U D',
+      style: TextStyle(
+        color: Color(0xFF00F0FF),
+        letterSpacing: 4,
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        fontFamily: 'monospace',
       ),
     );
   }
