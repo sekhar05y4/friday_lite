@@ -17,8 +17,8 @@ except ImportError:
     GENAI_AVAILABLE = False
 
 
-def close_youtube_tabs() -> str:
-    """Closes YouTube tabs or active Chrome media windows using ctypes keybd_event (Ctrl+W) and taskkill filter."""
+def close_active_browser_tab() -> str:
+    """Closes active browser tabs using Win32 window activation and Ctrl+W keystrokes."""
     try:
         user32 = ctypes.windll.user32
         VK_CONTROL = 0x11
@@ -31,8 +31,8 @@ def close_youtube_tabs() -> str:
                 if length > 0:
                     buff = ctypes.create_unicode_buffer(length + 1)
                     user32.GetWindowTextW(hwnd, buff, length + 1)
-                    title = buff.value
-                    if "YouTube" in title:
+                    title = buff.value.lower()
+                    if any(b in title for b in ["chrome", "edge", "firefox", "youtube", "friday"]):
                         user32.SetForegroundWindow(hwnd)
                         time.sleep(0.1)
                         user32.keybd_event(VK_CONTROL, 0, 0, 0)
@@ -46,23 +46,23 @@ def close_youtube_tabs() -> str:
         WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
         user32.EnumWindows(WNDENUMPROC(enum_proc), 0)
 
-        # Additional taskkill filter for YouTube titled windows
+        # Additional taskkill filter for standalone YouTube windows
         subprocess.run('taskkill /F /FI "WINDOWTITLE eq *YouTube*"', shell=True, capture_output=True)
-        return "Closed active YouTube media tabs and windows, Boss."
+        return "Closed active browser tab, Boss."
     except Exception as e:
-        return f"Closed YouTube tabs: {e}"
+        return f"Closed tab: {e}"
 
 
 def execute_os_command(cleaned: str) -> str:
     """Execute real Windows OS process management & system application launcher commands."""
-    # ── 1. Target YouTube Tab Closing (supporting speech variations) ─────────
-    youtube_close_phrases = [
-        "close youtube", "closed youtube", "stop youtube", "close tabs",
-        "closed tabs", "tabs are not closed", "close youtube tab", "close youtube taps",
-        "closed youtube taps", "closed youtube tabs", "close youtube window"
+    # ── 1. Comprehensive Tab Closing Phrase Matcher ──────────────────────────
+    tab_close_phrases = [
+        "close tab", "close tabs", "close all tabs", "close current tab", "close active tab",
+        "close youtube", "closed youtube", "stop youtube", "close youtube tab", "close youtube taps",
+        "closed youtube taps", "closed youtube tabs", "close youtube window", "tabs are not closed"
     ]
-    if any(phrase in cleaned for phrase in youtube_close_phrases):
-        return close_youtube_tabs()
+    if any(phrase in cleaned for phrase in tab_close_phrases):
+        return close_active_browser_tab()
 
     if "close chrome" in cleaned or "close browser" in cleaned or "kill chrome" in cleaned:
         subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, capture_output=True)
