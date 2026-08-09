@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -136,7 +137,7 @@ class _HomeBodyState extends State<_HomeBody> {
                   children: [
                     // ── TOP ROW: Waveform | Header Banner | Per-Core CPU Chart ────
                     SizedBox(
-                      height: 80,
+                      height: 76,
                       child: Row(
                         children: [
                           Expanded(
@@ -157,11 +158,11 @@ class _HomeBodyState extends State<_HomeBody> {
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                    // ── MIDDLE ROW: Tech Grid | Arc Reactor Core | Histogram Equalizer
+                    // ── MIDDLE ROW: Tech Grid | Bounded Arc Reactor Core | Spider Chart
                     Expanded(
-                      flex: 6,
+                      flex: 5,
                       child: Row(
                         children: [
                           // Left Tech Status Grid & Scanner
@@ -171,30 +172,36 @@ class _HomeBodyState extends State<_HomeBody> {
                           ),
                           const SizedBox(width: 8),
 
-                          // Center Arc Reactor HUD Core
+                          // Center Bounded Arc Reactor Core
                           Expanded(
                             flex: 4,
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  GlowingOrb(
-                                    status: assistant.status,
-                                    size: MediaQuery.of(context).size.width * 0.42,
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final size = math.min(constraints.maxHeight * 0.82, constraints.maxWidth * 0.82).clamp(100.0, 190.0);
+                                return Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      GlowingOrb(
+                                        status: assistant.status,
+                                        size: size,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        'FRIDAY SYSTEM CONTROL',
+                                        style: TextStyle(
+                                          color: Color(0xFF00F0FF),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.8,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 6),
-                                  const Text(
-                                    'FRIDAY SYSTEM CONTROL',
-                                    style: TextStyle(
-                                      color: Color(0xFF00F0FF),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2.0,
-                                      fontFamily: 'monospace',
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -269,10 +276,6 @@ class _SciFiGridBackground extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFF071019),
-        image: DecorationImage(
-          image: NetworkImage(''), // Clean solid dark backdrop
-          fit: BoxFit.cover,
-        ),
       ),
       child: CustomPaint(
         painter: _BackgroundGridPainter(),
