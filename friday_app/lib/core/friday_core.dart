@@ -26,7 +26,7 @@ class FridayCore extends ChangeNotifier {
 
   static final FridayCore instance = FridayCore._();
 
-  PowerMode _powerMode = PowerMode.off;
+  PowerMode _powerMode = PowerMode.on;
 
   /// Current power mode. Observe via [context.watch<FridayCore>()] or
   /// subscribe to [PowerChangedEvent] on the [EventBus].
@@ -42,7 +42,6 @@ class FridayCore extends ChangeNotifier {
   /// Initialise the Core once at app startup.
   ///
   /// Registers [modules] and wires the [aiRouter] callback.
-  /// Does NOT turn the assistant ON — it starts in OFF mode.
   Future<void> init({
     required List<IActionModule> modules,
     required Future<CommandResult> Function(String) aiRouter,
@@ -53,7 +52,7 @@ class FridayCore extends ChangeNotifier {
     CapabilityManager.instance.refresh();
     CommandRouter.instance.setAiRouter(aiRouter);
 
-    FridayLogger.log(LogCategory.assistant, 'FridayCore: ready (OFF mode)');
+    FridayLogger.log(LogCategory.assistant, 'FridayCore: ready (ON mode)');
   }
 
   // ---------------------------------------------------------------------------

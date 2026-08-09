@@ -35,7 +35,7 @@ enum AssistantStatus {
   speaking,
 }
 
-/// Manages the assistant's conversational state and hands-free continuous voice pipeline.
+/// Manages the assistant's conversational state and hands-free continuous voice pipeline with wake-word support.
 class AssistantProvider extends ChangeNotifier {
   AssistantProvider() {
     _subscribeToEvents();
@@ -48,6 +48,7 @@ class AssistantProvider extends ChangeNotifier {
   String _interimText = '';
   final List<AssistantMessage> _messages = [];
   bool _autoListen = true;
+  bool _isStandby = false;
 
   final List<StreamSubscription<dynamic>> _subscriptions = [];
 
@@ -56,6 +57,7 @@ class AssistantProvider extends ChangeNotifier {
   List<AssistantMessage> get messages => List.unmodifiable(_messages);
   bool get isListening => _status == AssistantStatus.listening;
   bool get autoListen => _autoListen;
+  bool get isStandby => _isStandby;
 
   void _setStatus(AssistantStatus status) {
     if (_status == status) return;
@@ -95,13 +97,7 @@ class AssistantProvider extends ChangeNotifier {
           _handleTranscript(event.transcript);
         } else {
           _setStatus(AssistantStatus.idle);
-          if (_autoListen && FridayCore.instance.powerMode.isOn) {
-            Future.delayed(const Duration(milliseconds: 300), () {
-              if (FridayCore.instance.powerMode.isOn) {
-                startListening();
-              }
-            });
-          }
+          _scheduleAutoReListen();
         }
       }),
     );
@@ -110,13 +106,7 @@ class AssistantProvider extends ChangeNotifier {
       EventBus.instance.on<SpeechErrorEvent>().listen((event) {
         _interimText = '';
         _setStatus(AssistantStatus.idle);
-        if (_autoListen && FridayCore.instance.powerMode.isOn) {
-          Future.delayed(const Duration(milliseconds: 600), () {
-            if (FridayCore.instance.powerMode.isOn) {
-              startListening();
-            }
-          });
-        }
+        _scheduleAutoReListen();
       }),
     );
 
@@ -124,22 +114,27 @@ class AssistantProvider extends ChangeNotifier {
       EventBus.instance.on<ConversationFinishedEvent>().listen((_) {
         if (FridayCore.instance.powerMode.isOff) return;
         _setStatus(AssistantStatus.idle);
-
-        if (_autoListen) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (FridayCore.instance.powerMode.isOn) {
-              startListening();
-            }
-          });
-        }
+        _scheduleAutoReListen();
       }),
     );
+  }
+
+  void _scheduleAutoReListen() {
+    if (_autoListen && FridayCore.instance.powerMode.isOn) {
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (FridayCore.instance.powerMode.isOn) {
+          startListening();
+        }
+      });
+    }
   }
 
   bool _isBriefingInProgress = false;
 
   void _handlePowerOn() {
     _autoListen = true;
+    _isStandby = false;
+    startListening();
   }
 
   void _handlePowerOff() {
@@ -174,6 +169,7 @@ class AssistantProvider extends ChangeNotifier {
     final briefingText = "$greeting All systems operational. CPU load is at $cpu percent. RAM usage is $ramUsed out of $ramTotal gigabytes. Battery is at $bat percent and $chargingStr. Active processes include $topApp. Connection verified on $net.";
 
     _autoListen = true;
+    _isStandby = false;
     await speak(briefingText);
     _isBriefingInProgress = false;
   }
@@ -191,6 +187,7 @@ class AssistantProvider extends ChangeNotifier {
 
     if (!started) {
       _setStatus(AssistantStatus.idle);
+      _scheduleAutoReListen();
     }
   }
 
@@ -210,13 +207,50 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> _handleTranscript(String transcript) async {
     if (FridayCore.instance.powerMode.isOff) return;
 
-    final lower = transcript.toLowerCase();
-    if (lower.contains('wake up friday') || lower.contains('hey friday') || lower.contains('wake up')) {
+    final lower = transcript.toLowerCase().trim();
+
+    // ── Check Wake Words ───────────────────────────────────────────────────
+    final isWakeWord = lower.contains('wake up friday') ||
+        lower.contains('hey friday') ||
+        lower.contains('ok friday') ||
+        lower.contains('wake up') ||
+        lower == 'friday';
+
+    if (_isStandby) {
+      if (isWakeWord) {
+        _isStandby = false;
+        notifyListeners();
+        addMessage(role: 'user', content: transcript);
+        await triggerWakeUpBriefing();
+      } else {
+        // Silently ignore speech while in Standby mode, keeping mic active!
+        _scheduleAutoReListen();
+      }
+      return;
+    }
+
+    // ── Check Sleep Words ──────────────────────────────────────────────────
+    final isSleepWord = lower.contains('go to sleep') ||
+        lower.contains('sleep friday') ||
+        lower.contains('standby friday') ||
+        lower == 'sleep' ||
+        lower == 'go sleep';
+
+    if (isSleepWord) {
+      _isStandby = true;
+      notifyListeners();
+      addMessage(role: 'user', content: transcript);
+      await speak("Entering standby mode. I am listening for your wake word.");
+      return;
+    }
+
+    if (isWakeWord) {
       addMessage(role: 'user', content: transcript);
       await triggerWakeUpBriefing();
       return;
     }
 
+    // ── Normal Active Command Execution ────────────────────────────────────
     addMessage(role: 'user', content: transcript);
     _setStatus(AssistantStatus.processing);
 

@@ -89,6 +89,11 @@ class _HomeBodyState extends State<_HomeBody> {
   void initState() {
     super.initState();
     TelemetryService.instance.startPolling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AssistantProvider>().startListening();
+      }
+    });
   }
 
   @override
