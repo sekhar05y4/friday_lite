@@ -17,12 +17,22 @@ except ImportError:
 
 def execute_os_command(cleaned: str) -> str:
     """Execute real Windows OS process management & system application launcher commands."""
-    # ── 1. Target YouTube Tab Closing (Preserving FRIDAY Lite tab) ─────────
+    # ── 1. Target YouTube Tab Closing using PowerShell SendKeys (Ctrl+W) ─────────
     if any(phrase in cleaned for phrase in ["close youtube", "stop youtube", "close tabs", "tabs are not closed", "close youtube tab"]):
         try:
-            ps_script = "Get-Process chrome, msedge, firefox -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like '*YouTube*'} | Stop-Process -Force"
+            ps_script = '''
+            $wshell = New-Object -ComObject wscript.shell;
+            $procs = Get-Process chrome, msedge, firefox -ErrorAction SilentlyContinue;
+            foreach ($p in $procs) {
+                if ($p.MainWindowTitle -like "*YouTube*") {
+                    $wshell.AppActivate($p.Id);
+                    Start-Sleep -Milliseconds 150;
+                    $wshell.SendKeys("^w");
+                }
+            }
+            '''
             subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
-            return "Closed YouTube media tabs and windows, Boss."
+            return "Closed active YouTube media tabs, Boss."
         except Exception as e:
             return f"Closed YouTube tabs: {e}"
 

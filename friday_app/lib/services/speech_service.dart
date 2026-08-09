@@ -192,7 +192,10 @@ class SpeechService {
   void _onStatus(String status) {
     FridayLogger.log(LogCategory.speech, 'STT status: $status');
     if (status == 'done' || status == 'notListening') {
-      _isListening = false;
+      if (_isListening) {
+        _isListening = false;
+        EventBus.instance.fire(const SpeechFinishedEvent(''));
+      }
     }
   }
 
