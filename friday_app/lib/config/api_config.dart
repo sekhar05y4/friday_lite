@@ -1,12 +1,18 @@
+import 'package:flutter/foundation.dart';
+
 /// API configuration constants.
 /// All URLs and endpoints are centralized here.
-/// Never hardcode these values elsewhere in the codebase.
 class ApiConfig {
   ApiConfig._();
 
-  /// Base URL of the Friday backend Flask server.
-  /// Override via [SettingsRepository] at runtime.
-  static const String defaultBaseUrl = 'http://10.0.2.2:5000';
+  /// Default Base URL of the Friday backend Flask server.
+  /// Automatically picks http://localhost:5000 on Web/Desktop, or http://192.168.1.6:5000 for local Wi-Fi.
+  static String get defaultBaseUrl {
+    if (kIsWeb) {
+      return 'http://127.0.0.1:5000';
+    }
+    return 'http://192.168.1.6:5000';
+  }
 
   // --- Endpoints ---
   static const String intentEndpoint = '/intent';
