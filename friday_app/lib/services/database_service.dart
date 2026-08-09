@@ -15,7 +15,7 @@ class DatabaseService {
   static final DatabaseService instance = DatabaseService._();
 
   static const String _dbName = 'friday_lite.db';
-  static const int _dbVersion = 5;
+  static const int _dbVersion = 6;
 
   Database? _database;
 
@@ -63,10 +63,12 @@ class DatabaseService {
     // ── Chat messages ─────────────────────────────────────────────────────
     await db.execute('''
       CREATE TABLE IF NOT EXISTS chat_messages (
-        id        INTEGER PRIMARY KEY AUTOINCREMENT,
-        role      TEXT    NOT NULL,
-        content   TEXT    NOT NULL,
-        timestamp INTEGER NOT NULL
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        role              TEXT    NOT NULL,
+        content           TEXT    NOT NULL,
+        timestamp         INTEGER NOT NULL,
+        prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+        completion_tokens INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -271,6 +273,13 @@ class DatabaseService {
           result_speech  TEXT    NOT NULL
         )
       ''');
+    }
+
+    if (oldVersion < 6) {
+      try {
+        await db.execute('ALTER TABLE chat_messages ADD COLUMN prompt_tokens INTEGER DEFAULT 0;');
+        await db.execute('ALTER TABLE chat_messages ADD COLUMN completion_tokens INTEGER DEFAULT 0;');
+      } catch (_) {}
     }
   }
 }

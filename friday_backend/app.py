@@ -12,6 +12,7 @@ from routes.health_routes import health_bp
 from routes.intent_routes import intent_bp
 from routes.chat_routes import chat_bp
 from routes.settings_routes import settings_bp
+from routes.telemetry_routes import telemetry_bp
 
 log = get_logger("app")
 
@@ -23,6 +24,7 @@ app.register_blueprint(health_bp)
 app.register_blueprint(intent_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(telemetry_bp)
 
 
 @app.get("/weather")

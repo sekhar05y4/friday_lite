@@ -5,21 +5,17 @@ import '../config/theme_config.dart';
 import '../core/friday_core.dart';
 import '../core/power_mode.dart';
 import '../providers/assistant_provider.dart';
-import '../widgets/glowing_orb.dart';
-import '../widgets/status_badge.dart';
-import '../widgets/power_button.dart';
-import '../widgets/mic_button.dart';
+import '../services/telemetry_service.dart';
 import '../widgets/conversation_panel.dart';
+import '../widgets/glowing_orb.dart';
+import '../widgets/hud_telemetry_bar.dart';
+import '../widgets/hud_token_meter.dart';
+import '../widgets/mic_button.dart';
+import '../widgets/power_button.dart';
+import '../widgets/status_badge.dart';
 import 'settings_screen.dart';
 
-/// The primary assistant interface.
-///
-/// Layout (top → bottom):
-///   ┌─ AppBar: FRIDAY title + settings icon
-///   ├─ GlowingOrb (center, takes ~42% of vertical space)
-///   ├─ StatusBadge
-///   ├─ Interim / conversation transcript
-///   └─ Control bar: Power button + Mic button
+/// The primary assistant interface — Jarvis Sci-Fi HUD Dashboard.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -43,7 +39,7 @@ class HomeScreen extends StatelessWidget {
         IconButton(
           icon: const Icon(Icons.tune_rounded),
           color: ThemeConfig.textSecondary,
-          tooltip: 'Settings',
+          tooltip: 'Settings & Diagnostics',
           onPressed: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -55,10 +51,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Home body — rebuilt on state change
-// ---------------------------------------------------------------------------
-
 class _HomeBody extends StatefulWidget {
   @override
   State<_HomeBody> createState() => _HomeBodyState();
@@ -68,21 +60,32 @@ class _HomeBodyState extends State<_HomeBody> {
   bool _wasOn = false;
 
   @override
+  void initState() {
+    super.initState();
+    TelemetryService.instance.startPolling();
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final core = context.read<FridayCore>();
     final isOn = core.powerMode.isOn;
 
-    // Greet on first power-on
     if (isOn && !_wasOn) {
       _wasOn = true;
       final assistant = context.read<AssistantProvider>();
       Future.delayed(const Duration(milliseconds: 400), () {
-        if (mounted) assistant.speak('Hello. I am FRIDAY. How can I help you?');
+        if (mounted) assistant.speak('Hello. I am FRIDAY. System telemetry and AI core active.');
       });
     } else if (!isOn) {
       _wasOn = false;
     }
+  }
+
+  @override
+  void dispose() {
+    TelemetryService.instance.stopPolling();
+    super.dispose();
   }
 
   @override
@@ -91,79 +94,95 @@ class _HomeBodyState extends State<_HomeBody> {
     final assistant = context.watch<AssistantProvider>();
     final isPoweredOn = core.powerMode.isOn;
 
-    return Stack(
-      children: [
-        // Ambient background gradient
-        _AmbientBackground(
-          status: assistant.status,
-          isPoweredOn: isPoweredOn,
-        ),
+    return ListenableBuilder(
+      listenable: TelemetryService.instance,
+      builder: (context, _) {
+        final telemetryData = TelemetryService.instance.data;
 
-        // Main content
-        SafeArea(
-          child: Column(
-            children: [
-              const SizedBox(height: 16),
+        return Stack(
+          children: [
+            // Ambient background gradient
+            _AmbientBackground(
+              status: assistant.status,
+              isPoweredOn: isPoweredOn,
+            ),
 
-              // ── Orb section ──────────────────────────────────────────
-              Expanded(
-                flex: 5,
-                child: Center(
-                  child: GlowingOrb(
+            // Main Sci-Fi HUD content
+            SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+
+                  // ── Top Telemetry HUD Bar ──────────────────────────────
+                  HudTelemetryBar(
+                    data: telemetryData,
+                    isPoweredOn: isPoweredOn,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // ── Arc Reactor Voice Core ──────────────────────────────
+                  Expanded(
+                    flex: 5,
+                    child: Center(
+                      child: GlowingOrb(
+                        status: assistant.status,
+                        size: MediaQuery.of(context).size.width * 0.58,
+                      ),
+                    ),
+                  ),
+
+                  // ── Status badge ─────────────────────────────────────────
+                  StatusBadge(
                     status: assistant.status,
-                    size: MediaQuery.of(context).size.width * 0.60,
+                    isPoweredOn: isPoweredOn,
                   ),
-                ),
-              ),
 
-              // ── Status badge ─────────────────────────────────────────
-              StatusBadge(
-                status: assistant.status,
-                isPoweredOn: isPoweredOn,
-              ),
+                  const SizedBox(height: 12),
 
-              const SizedBox(height: 20),
-
-              // ── Conversation panel ───────────────────────────────────
-              Expanded(
-                flex: 4,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ConversationPanel(
-                    messages: assistant.messages,
-                    interimText: assistant.interimText,
+                  // ── Conversation panel ───────────────────────────────────
+                  Expanded(
+                    flex: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ConversationPanel(
+                        messages: assistant.messages,
+                        interimText: assistant.interimText,
+                      ),
+                    ),
                   ),
-                ),
+
+                  const SizedBox(height: 8),
+
+                  // ── Bottom Token & Network Meter ────────────────────────
+                  HudTokenMeter(data: telemetryData),
+
+                  const SizedBox(height: 12),
+
+                  // ── Control bar ──────────────────────────────────────────
+                  _ControlBar(
+                    isPoweredOn: isPoweredOn,
+                    status: assistant.status,
+                    onPowerToggle: () => core.togglePower(),
+                    onMicPressed: () {
+                      if (assistant.status == AssistantStatus.listening) {
+                        assistant.stopListening();
+                      } else {
+                        assistant.startListening();
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+                ],
               ),
-
-              const SizedBox(height: 24),
-
-              // ── Control bar ──────────────────────────────────────────
-              _ControlBar(
-                isPoweredOn: isPoweredOn,
-                status: assistant.status,
-                onPowerToggle: () => core.togglePower(),
-                onMicPressed: () {
-                  if (assistant.status == AssistantStatus.listening) {
-                    assistant.stopListening();
-                  } else {
-                    assistant.startListening();
-                  }
-                },
-              ),
-
-              const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Ambient radial gradient background
-// ---------------------------------------------------------------------------
 
 class _AmbientBackground extends StatelessWidget {
   final AssistantStatus status;
@@ -177,13 +196,13 @@ class _AmbientBackground extends StatelessWidget {
   Color get _ambientColor {
     if (!isPoweredOn) return ThemeConfig.statusOff.withValues(alpha: 0.04);
     return switch (status) {
-      AssistantStatus.idle => ThemeConfig.primary.withValues(alpha: 0.03),
+      AssistantStatus.idle => ThemeConfig.primary.withValues(alpha: 0.04),
       AssistantStatus.listening =>
-        ThemeConfig.statusListening.withValues(alpha: 0.06),
+        ThemeConfig.statusListening.withValues(alpha: 0.08),
       AssistantStatus.processing =>
-        ThemeConfig.statusProcessing.withValues(alpha: 0.05),
+        ThemeConfig.statusProcessing.withValues(alpha: 0.06),
       AssistantStatus.speaking =>
-        ThemeConfig.statusSpeaking.withValues(alpha: 0.05),
+        ThemeConfig.statusSpeaking.withValues(alpha: 0.06),
     };
   }
 
@@ -193,8 +212,8 @@ class _AmbientBackground extends StatelessWidget {
       duration: const Duration(milliseconds: 600),
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: const Alignment(0, -0.3),
-          radius: 1.0,
+          center: const Alignment(0, -0.2),
+          radius: 1.1,
           colors: [
             _ambientColor,
             ThemeConfig.background,
@@ -204,10 +223,6 @@ class _AmbientBackground extends StatelessWidget {
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Control bar (Power + Mic)
-// ---------------------------------------------------------------------------
 
 class _ControlBar extends StatelessWidget {
   final bool isPoweredOn;
@@ -237,7 +252,7 @@ class _ControlBar extends StatelessWidget {
                 isOn: isPoweredOn,
                 onToggle: onPowerToggle,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 isPoweredOn ? 'TURN OFF' : 'TURN ON',
                 style: const TextStyle(
@@ -258,7 +273,7 @@ class _ControlBar extends StatelessWidget {
                 status: status,
                 onPressed: onMicPressed,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 status == AssistantStatus.listening ? 'STOP' : 'SPEAK',
                 style: const TextStyle(
@@ -276,10 +291,6 @@ class _ControlBar extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// FRIDAY animated title
-// ---------------------------------------------------------------------------
-
 class _FridayTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -290,11 +301,12 @@ class _FridayTitle extends StatelessWidget {
         end: Alignment.centerRight,
       ).createShader(bounds),
       child: Text(
-        'F R I D A Y',
+        'F R I D A Y   H U D',
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
-              letterSpacing: 8,
-              fontSize: 18,
+              letterSpacing: 6,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
             ),
       ),
     );

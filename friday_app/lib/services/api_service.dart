@@ -44,6 +44,11 @@ class ApiService {
   /// Alias for health check.
   Future<bool> checkHealth() => ping();
 
+  /// Fetch system telemetry metrics (CPU, RAM, Battery, Top Processes, Networks).
+  Future<Map<String, dynamic>> getTelemetry() async {
+    return _get('/api/telemetry');
+  }
+
   // ---------------------------------------------------------------------------
   // Intent detection  (Phase 7)
   // ---------------------------------------------------------------------------

@@ -42,7 +42,12 @@ class GeminiBackendProvider(IBackendAIProvider):
                 "speech_response": "I didn't hear anything.",
                 "confidence": 0.0,
                 "requires_confirmation": False,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
             }
+
+        prompt_tokens = max(1, len(text) // 4)
 
         if self._is_configured:
             prompt = f"""
@@ -67,24 +72,36 @@ Respond ONLY with a JSON object in this format:
                 clean_json = clean_json.strip()
 
                 data = json.loads(clean_json)
+
+                p_tokens = getattr(response.usage_metadata, 'prompt_token_count', len(prompt) // 4)
+                c_tokens = getattr(response.usage_metadata, 'candidates_token_count', len(response.text) // 4)
+                t_tokens = getattr(response.usage_metadata, 'total_token_count', p_tokens + c_tokens)
+
                 return {
                     "intent": data.get("intent", "CHAT"),
                     "parameters": data.get("parameters", {}),
                     "speech_response": data.get("speech_response", "Processed with Gemini."),
                     "confidence": data.get("confidence", 0.9),
                     "requires_confirmation": False,
+                    "prompt_tokens": p_tokens,
+                    "completion_tokens": c_tokens,
+                    "total_tokens": t_tokens,
                 }
             except Exception as e:
                 log.error(f"Gemini API error during intent detection: {e}")
 
         # Rich Backend Heuristic Engine
         speech = self.generate_chat_reply(text, [])
+        comp_tokens = max(1, len(speech) // 4)
         return {
             "intent": "CHAT",
             "parameters": {},
             "speech_response": speech,
             "confidence": 0.85,
             "requires_confirmation": False,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": comp_tokens,
+            "total_tokens": prompt_tokens + comp_tokens,
         }
 
     def chat(self, message: str, history: List[Dict[str, str]] = None) -> str:
@@ -120,7 +137,7 @@ Respond ONLY with a JSON object in this format:
         if "system" in cleaned or "module" in cleaned or "how many" in cleaned:
             return "FRIDAY Lite consists of 20 integrated feature systems across Telephony, Productivity, Device Control, Camera Vision, Long-Term Memory, Desktop Companion, Automation Engine, and Smart Home Platform."
 
-        if cleaned.startswith("hi") or cleaned.startswith("hello") or cleaned.startsWith("hey"):
+        if cleaned.startswith("hi") or cleaned.startswith("hello") or cleaned.startswith("hey"):
             return "Hello! I am online and ready to assist."
 
         return f"Regarding '{message}': All 20 FRIDAY backend services and local modules are online and ready to execute your commands."

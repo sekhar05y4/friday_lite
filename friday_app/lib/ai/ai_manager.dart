@@ -2,6 +2,7 @@ import '../interfaces/i_ai_provider.dart';
 import '../models/command_result.dart';
 import '../models/intent_result.dart';
 import '../repositories/settings_repository.dart';
+import '../services/telemetry_service.dart';
 import '../utils/logger.dart';
 import 'ai_context_manager.dart';
 import 'gemini_provider.dart';
@@ -66,6 +67,10 @@ class AIManager {
       // 2. Fetch intent classification from active provider
       final rawMap = await _activeProvider.detectIntent(input);
       final intentResult = IntentResult.fromMap(rawMap);
+
+      final pTokens = (rawMap['prompt_tokens'] as int?) ?? (input.length ~/ 4);
+      final cTokens = (rawMap['completion_tokens'] as int?) ?? (intentResult.speechResponse.length ~/ 4);
+      TelemetryService.instance.recordTokenUsage(pTokens > 0 ? pTokens : 1, cTokens > 0 ? cTokens : 1);
 
       // If classified as free-form CHAT or gave an empty speech response, fallback to chat
       if (intentResult.intent == 'CHAT' && intentResult.speechResponse.isEmpty) {

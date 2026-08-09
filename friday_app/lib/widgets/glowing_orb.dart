@@ -1,20 +1,17 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-import '../config/theme_config.dart';
 import '../config/animation_config.dart';
+import '../config/theme_config.dart';
 import '../providers/assistant_provider.dart';
 
-/// Animated glowing AI orb that visually represents the assistant's state.
+/// Futuristic Jarvis-Style Arc Reactor Core.
 ///
-/// Uses [CustomPainter] with layered radial gradients and sine-wave breathing
-/// to create a premium, futuristic feel — no external animation libraries needed.
-///
-/// Colours per state:
-///   OFF         → deep grey-red dim pulse
-///   Listening   → electric cyan rapid wave
-///   Processing  → amber swirl
-///   Speaking    → violet-blue soundwave
+/// Features:
+///   - Concentric HUD tech rings with tick marks
+///   - Clockwise & counter-clockwise rotating energy arcs
+///   - Reactive multi-layered glow aura (Cyan, Gold, Purple, Green)
+///   - Crisp Sci-Fi central reactor core
 class GlowingOrb extends StatefulWidget {
   final AssistantStatus status;
   final double size;
@@ -31,18 +28,14 @@ class GlowingOrb extends StatefulWidget {
 
 class _GlowingOrbState extends State<GlowingOrb>
     with TickerProviderStateMixin {
-  // Breathing animation (scale + opacity pulse)
   late AnimationController _breathController;
   late Animation<double> _breathAnim;
 
-  // Rotation for the inner swirl layer
   late AnimationController _rotController;
   late Animation<double> _rotAnim;
 
-  // Colour transition between states
   late AnimationController _colorController;
 
-  // Store previous colours for smooth lerp transitions
   List<Color> _fromColors = ThemeConfig.orbOff;
   List<Color> _toColors = ThemeConfig.orbOff;
 
@@ -55,13 +48,13 @@ class _GlowingOrbState extends State<GlowingOrb>
       duration: _breathDuration(widget.status),
     )..repeat(reverse: true);
 
-    _breathAnim = Tween<double>(begin: 0.88, end: 1.0).animate(
+    _breathAnim = Tween<double>(begin: 0.90, end: 1.05).animate(
       CurvedAnimation(parent: _breathController, curve: Curves.easeInOut),
     );
 
     _rotController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(seconds: 10),
     )..repeat();
 
     _rotAnim = Tween<double>(begin: 0, end: 2 * math.pi).animate(_rotController);
@@ -79,7 +72,6 @@ class _GlowingOrbState extends State<GlowingOrb>
   void didUpdateWidget(GlowingOrb oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.status != widget.status) {
-      // Snapshot current lerped colours as the new "from"
       final t = _colorController.value;
       _fromColors = List.generate(
         3,
@@ -88,7 +80,6 @@ class _GlowingOrbState extends State<GlowingOrb>
       _toColors = _colorsForStatus(widget.status);
       _colorController.forward(from: 0);
 
-      // Adjust breath speed
       _breathController.duration = _breathDuration(widget.status);
       _breathController
         ..stop()
@@ -104,8 +95,6 @@ class _GlowingOrbState extends State<GlowingOrb>
     super.dispose();
   }
 
-  // ---------------------------------------------------------------------------
-
   List<Color> _colorsForStatus(AssistantStatus s) => switch (s) {
         AssistantStatus.idle => ThemeConfig.orbOff,
         AssistantStatus.listening => ThemeConfig.orbListening,
@@ -114,10 +103,10 @@ class _GlowingOrbState extends State<GlowingOrb>
       };
 
   Duration _breathDuration(AssistantStatus s) => switch (s) {
-        AssistantStatus.idle => const Duration(milliseconds: 3200),
-        AssistantStatus.listening => const Duration(milliseconds: 900),
-        AssistantStatus.processing => const Duration(milliseconds: 600),
-        AssistantStatus.speaking => const Duration(milliseconds: 750),
+        AssistantStatus.idle => const Duration(milliseconds: 3000),
+        AssistantStatus.listening => const Duration(milliseconds: 800),
+        AssistantStatus.processing => const Duration(milliseconds: 500),
+        AssistantStatus.speaking => const Duration(milliseconds: 700),
       };
 
   @override
@@ -137,7 +126,7 @@ class _GlowingOrbState extends State<GlowingOrb>
             width: widget.size,
             height: widget.size,
             child: CustomPaint(
-              painter: _OrbPainter(
+              painter: _ArcReactorPainter(
                 colors: colors,
                 rotation: _rotAnim.value,
                 breathValue: _breathAnim.value,
@@ -151,13 +140,13 @@ class _GlowingOrbState extends State<GlowingOrb>
   }
 }
 
-class _OrbPainter extends CustomPainter {
+class _ArcReactorPainter extends CustomPainter {
   final List<Color> colors;
   final double rotation;
   final double breathValue;
   final AssistantStatus status;
 
-  const _OrbPainter({
+  const _ArcReactorPainter({
     required this.colors,
     required this.rotation,
     required this.breathValue,
@@ -169,96 +158,132 @@ class _OrbPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // --- Layer 1: Outer glow ring ---
+    // --- 1. Outer Glow Aura ---
     final glowPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          colors[1].withValues(alpha: 0.18 * breathValue),
-          colors[0].withValues(alpha: 0),
+          colors[1].withValues(alpha: 0.22 * breathValue),
+          colors[0].withValues(alpha: 0.0),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
     canvas.drawCircle(center, radius, glowPaint);
 
-    // --- Layer 2: Mid glow ring ---
-    final midGlowPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          colors[1].withValues(alpha: 0.35 * breathValue),
-          colors[0].withValues(alpha: 0.05),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.78));
-    canvas.drawCircle(center, radius * 0.78, midGlowPaint);
+    // --- 2. Outer HUD Tick Ring ---
+    _drawHudTickRing(canvas, center, radius * 0.92, colors[1].withValues(alpha: 0.4));
 
-    // --- Layer 3: Rotating inner swirl ---
+    // --- 3. Rotating Outer Arc Segments ---
     canvas.save();
     canvas.translate(center.dx, center.dy);
-    canvas.rotate(rotation);
+    canvas.rotate(-rotation * 0.8);
     canvas.translate(-center.dx, -center.dy);
-
-    final swirlPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          colors[1].withValues(alpha: 0.0),
-          colors[1].withValues(alpha: 0.55),
-          colors[2].withValues(alpha: 0.3),
-          colors[1].withValues(alpha: 0.0),
-        ],
-        stops: const [0.0, 0.3, 0.6, 1.0],
-        transform: GradientRotation(rotation),
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.62));
-    canvas.drawCircle(center, radius * 0.62, swirlPaint);
+    _drawArcSegments(canvas, center, radius * 0.82, colors[1].withValues(alpha: 0.7));
     canvas.restore();
 
-    // --- Layer 4: Core orb ---
+    // --- 4. Rotating Inner Arc Segments ---
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation * 1.2);
+    canvas.translate(-center.dx, -center.dy);
+    _drawArcSegments(canvas, center, radius * 0.68, colors[2].withValues(alpha: 0.8));
+    canvas.restore();
+
+    // --- 5. Inner Concentric Ring ---
+    final innerRingPaint = Paint()
+      ..color = colors[1].withValues(alpha: 0.5)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(center, radius * 0.58, innerRingPaint);
+
+    // --- 6. Core Reactor Orb ---
     final corePaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          colors[1].withValues(alpha: 0.9),
+          colors[1].withValues(alpha: 0.95),
           colors[0].withValues(alpha: 0.85),
-          colors[2].withValues(alpha: 0.6),
+          colors[2].withValues(alpha: 0.7),
         ],
-        stops: const [0.0, 0.5, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.5));
-    canvas.drawCircle(center, radius * 0.5, corePaint);
+        stops: const [0.0, 0.45, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.46));
+    canvas.drawCircle(center, radius * 0.46, corePaint);
 
-    // --- Layer 5: Highlight specular ---
+    // --- 7. Core Highlight ---
     final highlightPaint = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(-0.4, -0.4),
+        center: const Alignment(-0.35, -0.35),
         colors: [
-          Colors.white.withValues(alpha: 0.22),
+          Colors.white.withValues(alpha: 0.35),
           Colors.transparent,
         ],
-      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.5));
-    canvas.drawCircle(center, radius * 0.5, highlightPaint);
+      ).createShader(Rect.fromCircle(center: center, radius: radius * 0.46));
+    canvas.drawCircle(center, radius * 0.46, highlightPaint);
 
-    // --- Layer 6: Sound wave rings (speaking mode) ---
+    // --- 8. Core Border & Tri-Arc Crosshairs ---
+    final borderPaint = Paint()
+      ..color = colors[1].withValues(alpha: 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    canvas.drawCircle(center, radius * 0.46, borderPaint);
+
+    _drawCrosshairs(canvas, center, radius * 0.46, colors[1]);
+
+    // --- 9. Sound Wave Waves (Speaking Mode) ---
     if (status == AssistantStatus.speaking) {
       _drawWaveRings(canvas, center, radius, colors[1]);
     }
-
-    // --- Layer 7: Crisp border ---
-    final borderPaint = Paint()
-      ..color = colors[1].withValues(alpha: 0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawCircle(center, radius * 0.5, borderPaint);
   }
 
-  void _drawWaveRings(
-      Canvas canvas, Offset center, double radius, Color color) {
+  void _drawHudTickRing(Canvas canvas, Offset center, double r, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    const count = 36;
+    for (int i = 0; i < count; i++) {
+      final angle = (i * 360 / count) * math.pi / 180;
+      final p1 = Offset(center.dx + r * math.cos(angle), center.dy + r * math.sin(angle));
+      final p2 = Offset(center.dx + (r - 6) * math.cos(angle), center.dy + (r - 6) * math.sin(angle));
+      canvas.drawLine(p1, p2, paint);
+    }
+  }
+
+  void _drawArcSegments(Canvas canvas, Offset center, double r, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromCircle(center: center, radius: r);
+    canvas.drawArc(rect, 0, math.pi / 3, false, paint);
+    canvas.drawArc(rect, 2 * math.pi / 3, math.pi / 3, false, paint);
+    canvas.drawArc(rect, 4 * math.pi / 3, math.pi / 3, false, paint);
+  }
+
+  void _drawCrosshairs(Canvas canvas, Offset center, double r, Color color) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.5)
+      ..strokeWidth = 1.0;
+
+    canvas.drawLine(Offset(center.dx - r - 4, center.dy), Offset(center.dx - r + 8, center.dy), paint);
+    canvas.drawLine(Offset(center.dx + r - 8, center.dy), Offset(center.dx + r + 4, center.dy), paint);
+    canvas.drawLine(Offset(center.dx, center.dy - r - 4), Offset(center.dx, center.dy - r + 8), paint);
+    canvas.drawLine(Offset(center.dx, center.dy + r - 8), Offset(center.dx, center.dy + r + 4), paint);
+  }
+
+  void _drawWaveRings(Canvas canvas, Offset center, double radius, Color color) {
     for (int i = 1; i <= 3; i++) {
-      final ringRadius = radius * (0.55 + i * 0.14);
+      final ringRadius = radius * (0.50 + i * 0.12);
       final ringPaint = Paint()
-        ..color = color.withValues(alpha: (0.25 / i) * breathValue)
+        ..color = color.withValues(alpha: (0.30 / i) * breathValue)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0;
+        ..strokeWidth = 1.5;
       canvas.drawCircle(center, ringRadius, ringPaint);
     }
   }
 
   @override
-  bool shouldRepaint(_OrbPainter old) =>
+  bool shouldRepaint(_ArcReactorPainter old) =>
       old.colors != colors ||
       old.rotation != rotation ||
       old.breathValue != breathValue ||
