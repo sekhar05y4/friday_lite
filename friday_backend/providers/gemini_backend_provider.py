@@ -17,8 +17,13 @@ except ImportError:
 
 def execute_os_command(cleaned: str) -> str:
     """Execute real Windows OS process management & system application launcher commands."""
-    # ── 1. Target YouTube Tab Closing using PowerShell SendKeys (Ctrl+W) ─────────
-    if any(phrase in cleaned for phrase in ["close youtube", "stop youtube", "close tabs", "tabs are not closed", "close youtube tab"]):
+    # ── 1. Target YouTube Tab Closing (supporting speech variations: taps/tabs/closed/close)
+    youtube_close_phrases = [
+        "close youtube", "closed youtube", "stop youtube", "close tabs",
+        "closed tabs", "tabs are not closed", "close youtube tab", "close youtube taps",
+        "closed youtube taps", "closed youtube tabs", "close youtube window"
+    ]
+    if any(phrase in cleaned for phrase in youtube_close_phrases):
         try:
             ps_script = '''
             $wshell = New-Object -ComObject wscript.shell;

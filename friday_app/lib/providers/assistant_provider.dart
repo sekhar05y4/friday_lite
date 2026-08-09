@@ -209,26 +209,6 @@ class AssistantProvider extends ChangeNotifier {
 
     final lower = transcript.toLowerCase().trim();
 
-    // ── Check Wake Words ───────────────────────────────────────────────────
-    final isWakeWord = lower.contains('wake up friday') ||
-        lower.contains('hey friday') ||
-        lower.contains('ok friday') ||
-        lower.contains('wake up') ||
-        lower == 'friday';
-
-    if (_isStandby) {
-      if (isWakeWord) {
-        _isStandby = false;
-        notifyListeners();
-        addMessage(role: 'user', content: transcript);
-        await triggerWakeUpBriefing();
-      } else {
-        // Silently ignore speech while in Standby mode, keeping mic active!
-        _scheduleAutoReListen();
-      }
-      return;
-    }
-
     // ── Check Sleep Words ──────────────────────────────────────────────────
     final isSleepWord = lower.contains('go to sleep') ||
         lower.contains('sleep friday') ||
@@ -244,17 +224,47 @@ class AssistantProvider extends ChangeNotifier {
       return;
     }
 
-    if (isWakeWord) {
+    // ── Strip Wake Word Prefix if Present ──────────────────────────────────
+    String commandText = lower;
+    bool hasWakePrefix = false;
+
+    for (final prefix in ['wake up friday', 'hey friday', 'ok friday', 'wake up', 'friday']) {
+      if (commandText.startsWith(prefix)) {
+        commandText = commandText.substring(prefix.length).trim();
+        hasWakePrefix = true;
+        break;
+      }
+    }
+
+    if (_isStandby) {
+      if (hasWakePrefix) {
+        _isStandby = false;
+        notifyListeners();
+        if (commandText.isEmpty) {
+          addMessage(role: 'user', content: transcript);
+          await triggerWakeUpBriefing();
+          return;
+        }
+      } else {
+        // Ignore general speech while in Standby mode
+        _scheduleAutoReListen();
+        return;
+      }
+    }
+
+    // If user said ONLY wake word (e.g. "hey friday"), trigger briefing
+    if (hasWakePrefix && commandText.isEmpty) {
       addMessage(role: 'user', content: transcript);
       await triggerWakeUpBriefing();
       return;
     }
 
-    // ── Normal Active Command Execution ────────────────────────────────────
+    // ── Execute Command (e.g. "close youtube tabs") ────────────────────────
+    final finalCommand = commandText.isNotEmpty ? commandText : transcript;
     addMessage(role: 'user', content: transcript);
     _setStatus(AssistantStatus.processing);
 
-    final result = await FridayCore.instance.route(transcript);
+    final result = await FridayCore.instance.route(finalCommand);
 
     if (FridayCore.instance.powerMode.isOff) return;
 
