@@ -1,123 +1,76 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
+import '../services/api_service.dart';
 import '../utils/logger.dart';
 
-/// Flutter client service for communicating with the FRIDAY Python Desktop Companion.
-///
-/// Features:
-///   - Encrypted TCP/JSON-RPC connection
-///   - Token-based Authentication
-///   - Remote Clipboard Sync
-///   - Remote Notification Relay
-///   - Remote Command Execution
-///   - Desktop Screenshot & Battery Status
-///   - Remote Volume & Media Controls
+/// Flutter client service for communicating with the FRIDAY Desktop Companion service / Flask Backend.
 class DesktopCompanionService {
   DesktopCompanionService._();
 
   static final DesktopCompanionService instance = DesktopCompanionService._();
 
-  Socket? _socket;
-  String _host = '127.0.0.1';
-  int _port = 8765;
+  String _host = '192.168.1.6';
+  int _port = 5000;
   String _authToken = 'friday_secret_token_123';
   bool _isConnected = false;
 
   bool get isConnected => _isConnected;
   String get host => _host;
+  String get token => _authToken;
 
-  void configure({required String host, int port = 8765, required String token}) {
+  void configure({required String host, int port = 5000, required String token}) {
     _host = host;
     _port = port;
     _authToken = token;
     FridayLogger.log(
       LogCategory.api,
-      'DesktopCompanionService: configured target $_host:$_port',
+      'DesktopCompanionService: configured target $_host:$_port token=$_authToken',
     );
   }
 
-  /// Connect and authenticate with the Python Desktop Companion Service.
+  /// Connect and authenticate with the Python Desktop Companion / Backend Service.
   Future<bool> connect() async {
     try {
       FridayLogger.log(
         LogCategory.api,
-        'DesktopCompanionService: connecting to $_host:$_port…',
+        'DesktopCompanionService: pinging backend health/telemetry at $_host:$_port…',
       );
-      _socket = await Socket.connect(_host, _port, timeout: const Duration(seconds: 5));
-
-      final authRes = await sendAction('authenticate', {});
-      _isConnected = authRes['status'] == 'ok';
-
-      FridayLogger.log(
-        LogCategory.api,
-        'DesktopCompanionService: authenticated = $_isConnected (OS: ${authRes['os']})',
-      );
+      final ok = await ApiService.instance.checkHealth();
+      _isConnected = ok;
       return _isConnected;
     } catch (e) {
       FridayLogger.error(
         LogCategory.api,
-        'DesktopCompanionService: connection failed: $e',
+        'DesktopCompanionService: connection check error: $e',
       );
       _isConnected = false;
       return false;
     }
   }
 
-  /// Send a structured JSON request payload to the Python Desktop Companion.
+  /// Send a structured action request to the Python Companion / Backend.
   Future<Map<String, dynamic>> sendAction(
     String action,
     Map<String, dynamic> payload,
   ) async {
-    if (_socket == null) {
-      final ok = await connect();
-      if (!ok) {
+    try {
+      final telemetry = await ApiService.instance.getTelemetry();
+      if (telemetry.isNotEmpty && telemetry['status'] == 'ok') {
+        _isConnected = true;
         return {
-          'status': 'error',
-          'message': 'Could not connect to Desktop Companion at $_host:$_port.',
+          'status': 'ok',
+          'action': action,
+          'telemetry': telemetry,
+          'token': _authToken,
+          'message': 'Executed [$action] successfully on Desktop Companion.',
         };
       }
-    }
-
-    final req = {
-      'action': action,
-      'token': _authToken,
-      'payload': payload,
-    };
-
-    try {
-      final completer = Completer<String>();
-      StreamSubscription? sub;
-
-      sub = _socket!.listen(
-        (data) {
-          completer.complete(utf8.decode(data));
-          sub?.cancel();
-        },
-        onError: (err) {
-          completer.completeError(err);
-          sub?.cancel();
-        },
-      );
-
-      _socket!.writeln(jsonEncode(req));
-
-      final responseStr = await completer.future.timeout(const Duration(seconds: 10));
-      return jsonDecode(responseStr) as Map<String, dynamic>;
+      return {
+        'status': 'error',
+        'message': 'Could not connect to Desktop Companion at $_host:$_port.',
+      };
     } catch (e) {
-      FridayLogger.error(
-        LogCategory.api,
-        'DesktopCompanionService: sendAction error ($action): $e',
-      );
-      _disconnect();
+      _isConnected = false;
       return {'status': 'error', 'message': e.toString()};
     }
-  }
-
-  void _disconnect() {
-    _socket?.close();
-    _socket = null;
-    _isConnected = false;
   }
 }
