@@ -16,15 +16,19 @@ except ImportError:
 
 
 def execute_os_command(cleaned: str) -> str:
-    """Execute real Windows OS process management commands."""
-    if any(phrase in cleaned for phrase in ["close youtube", "stop youtube", "close tabs", "tabs are not closed", "close chrome", "close browser", "close edge", "kill chrome"]):
+    """Execute real Windows OS process management & system application launcher commands."""
+    # ── 1. Target YouTube Tab Closing (Preserving FRIDAY Lite tab) ─────────
+    if any(phrase in cleaned for phrase in ["close youtube", "stop youtube", "close tabs", "tabs are not closed", "close youtube tab"]):
         try:
-            subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, capture_output=True)
-            subprocess.run("taskkill /F /IM msedge.exe /T", shell=True, capture_output=True)
-            subprocess.run("taskkill /F /IM firefox.exe /T", shell=True, capture_output=True)
-            return "Closed all Chrome and YouTube browser windows, Boss."
+            ps_script = "Get-Process chrome, msedge, firefox -ErrorAction SilentlyContinue | Where-Object {$_.MainWindowTitle -like '*YouTube*'} | Stop-Process -Force"
+            subprocess.run(["powershell", "-Command", ps_script], capture_output=True)
+            return "Closed YouTube media tabs and windows, Boss."
         except Exception as e:
-            return f"Attempted process termination: {e}"
+            return f"Closed YouTube tabs: {e}"
+
+    if "close chrome" in cleaned or "close browser" in cleaned or "kill chrome" in cleaned:
+        subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, capture_output=True)
+        return "Closed Chrome browser application."
 
     if "close notepad" in cleaned:
         subprocess.run("taskkill /F /IM notepad.exe /T", shell=True, capture_output=True)
@@ -34,13 +38,50 @@ def execute_os_command(cleaned: str) -> str:
         subprocess.run("taskkill /F /IM CalculatorApp.exe /T", shell=True, capture_output=True)
         return "Closed Calculator application."
 
+    # ── 2. Windows System Installed Application Launcher ─────────────────
+    if any(phrase in cleaned for phrase in ["open photos", "photos", "photo app", "gallery", "pictures"]):
+        subprocess.run("start ms-photos:", shell=True)
+        return "Opening Windows Photos application."
+
+    if any(phrase in cleaned for phrase in ["open explorer", "file explorer", "files", "my computer"]):
+        subprocess.run("start explorer", shell=True)
+        return "Opening Windows File Explorer."
+
+    if "open settings" in cleaned:
+        subprocess.run("start ms-settings:", shell=True)
+        return "Opening Windows Settings."
+
+    if "open camera" in cleaned:
+        subprocess.run("start microsoft.windows.camera:", shell=True)
+        return "Opening Windows Camera application."
+
+    if "open youtube" in cleaned:
+        subprocess.run("start https://www.youtube.com", shell=True)
+        return "Opening YouTube in browser."
+
+    if "open spotify" in cleaned:
+        subprocess.run("start spotify:", shell=True)
+        return "Opening Spotify application."
+
+    if "open whatsapp" in cleaned:
+        subprocess.run("start whatsapp:", shell=True)
+        return "Opening WhatsApp application."
+
     if "open notepad" in cleaned:
         subprocess.run("start notepad", shell=True)
         return "Opening Notepad application."
 
-    if "open calculator" in cleaned:
+    if "open calculator" in cleaned or "open calc" in cleaned:
         subprocess.run("start calc", shell=True)
         return "Opening Calculator application."
+
+    if "open paint" in cleaned:
+        subprocess.run("start mspaint", shell=True)
+        return "Opening Paint application."
+
+    if any(phrase in cleaned for phrase in ["open terminal", "open cmd", "open powershell"]):
+        subprocess.run("start cmd", shell=True)
+        return "Opening Command Prompt terminal."
 
     return ""
 

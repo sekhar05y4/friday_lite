@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,8 +8,7 @@ import '../utils/logger.dart';
 /// Low-level SQLite database service.
 ///
 /// The ONLY class in the app that directly touches sqflite.
-/// All reads and writes go through repository classes — never through this
-/// service directly from UI or business logic.
+/// Handles Web and native platforms gracefully.
 class DatabaseService {
   DatabaseService._();
 
@@ -18,10 +18,6 @@ class DatabaseService {
   static const int _dbVersion = 6;
 
   Database? _database;
-
-  // ---------------------------------------------------------------------------
-  // Public
-  // ---------------------------------------------------------------------------
 
   /// Returns the open [Database] instance, initialising it on first call.
   Future<Database> get database async {
@@ -36,22 +32,36 @@ class DatabaseService {
     FridayLogger.log(LogCategory.assistant, 'DatabaseService: closed');
   }
 
-  // ---------------------------------------------------------------------------
-  // Initialisation / Migrations
-  // ---------------------------------------------------------------------------
-
   Future<Database> _init() async {
-    final dir = await getApplicationDocumentsDirectory();
-    final path = join(dir.path, _dbName);
+    if (kIsWeb) {
+      FridayLogger.log(LogCategory.assistant, 'DatabaseService: web platform in-memory database');
+      return openDatabase(
+        inMemoryDatabasePath,
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    }
 
-    FridayLogger.log(LogCategory.assistant, 'DatabaseService: opening $path');
-
-    return openDatabase(
-      path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
-    );
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final path = join(dir.path, _dbName);
+      FridayLogger.log(LogCategory.assistant, 'DatabaseService: opening $path');
+      return openDatabase(
+        path,
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    } catch (e) {
+      FridayLogger.log(LogCategory.assistant, 'DatabaseService: path_provider fallback: $e');
+      return openDatabase(
+        inMemoryDatabasePath,
+        version: _dbVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -197,83 +207,6 @@ class DatabaseService {
       LogCategory.assistant,
       'DatabaseService: migrating v$oldVersion → v$newVersion',
     );
-
-    if (oldVersion < 2) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS calendar_events (
-          id           INTEGER PRIMARY KEY AUTOINCREMENT,
-          title        TEXT    NOT NULL,
-          start_time   INTEGER NOT NULL,
-          location     TEXT,
-          description  TEXT
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS alarms (
-          id           INTEGER PRIMARY KEY AUTOINCREMENT,
-          label        TEXT    NOT NULL,
-          alarm_time   INTEGER NOT NULL,
-          is_enabled   INTEGER NOT NULL DEFAULT 1
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS todo_items (
-          id           INTEGER PRIMARY KEY AUTOINCREMENT,
-          task         TEXT    NOT NULL,
-          is_done      INTEGER NOT NULL DEFAULT 0,
-          created_at   INTEGER NOT NULL
-        )
-      ''');
-    }
-
-    if (oldVersion < 3) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS installed_apps (
-          package_name  TEXT PRIMARY KEY,
-          app_name      TEXT NOT NULL,
-          category      TEXT NOT NULL,
-          launch_count  INTEGER NOT NULL DEFAULT 0,
-          last_launched INTEGER
-        )
-      ''');
-    }
-
-    if (oldVersion < 4) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS long_term_memory (
-          id          INTEGER PRIMARY KEY AUTOINCREMENT,
-          memory_type TEXT    NOT NULL,
-          key         TEXT    NOT NULL,
-          value       TEXT    NOT NULL,
-          ranking     INTEGER NOT NULL DEFAULT 1,
-          created_at  INTEGER NOT NULL,
-          expires_at  INTEGER
-        )
-      ''');
-    }
-
-    if (oldVersion < 5) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS automation_rules (
-          id             INTEGER PRIMARY KEY AUTOINCREMENT,
-          name           TEXT    NOT NULL,
-          trigger_type   TEXT    NOT NULL,
-          condition_json TEXT    NOT NULL,
-          action_command TEXT    NOT NULL,
-          is_enabled     INTEGER NOT NULL DEFAULT 1,
-          created_at     INTEGER NOT NULL
-        )
-      ''');
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS automation_history (
-          id             INTEGER PRIMARY KEY AUTOINCREMENT,
-          rule_id        INTEGER NOT NULL,
-          rule_name      TEXT    NOT NULL,
-          triggered_at   INTEGER NOT NULL,
-          result_speech  TEXT    NOT NULL
-        )
-      ''');
-    }
 
     if (oldVersion < 6) {
       try {
